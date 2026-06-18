@@ -50,9 +50,9 @@ QLabel[class="error-text"] {{ font-size: {T.SIZE_SM}px; color: {C.ERROR}; }}
 
 /* ── Buttons ───────────────────────────────────────────────────────────── */
 QPushButton {{
-    font-size: {T.SIZE_MD}px; font-weight: {T.WEIGHT_MEDIUM};
+    font-size: {T.SIZE_SM}px; font-weight: {T.WEIGHT_MEDIUM};
     border: none; border-radius: {R.MD}px;
-    padding: {S.SM}px {S.MD}px; min-height: 36px;
+    padding: {S.XS}px {S.MD}px; min-height: 28px;
 }}
 QPushButton[variant="primary"] {{ background-color: {C.ACCENT}; color: white; }}
 QPushButton[variant="primary"]:hover {{ background-color: {C.ACCENT_HOVER}; }}
@@ -82,8 +82,8 @@ QPushButton[variant="danger"]:pressed {{ background-color: #C04458; }}
 
 QPushButton[variant="icon"] {{
     background-color: transparent; border-radius: {R.MD}px; padding: {S.XS}px;
-    min-width: 36px; max-width: 36px; min-height: 36px; max-height: 36px;
-    color: {C.TEXT_SECONDARY}; font-size: {T.SIZE_LG}px;
+    min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px;
+    color: {C.TEXT_SECONDARY}; font-size: {T.SIZE_MD}px;
 }}
 QPushButton[variant="icon"]:hover {{ background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY}; }}
 QPushButton[variant="icon"]:pressed {{ background-color: {C.BG_OVERLAY}; }}
@@ -93,7 +93,7 @@ QPushButton[variant="icon"]:disabled {{ color: {C.TEXT_DISABLED}; }}
 QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox {{
     background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY};
     border: 1px solid {C.BORDER}; border-radius: {R.MD}px;
-    padding: {S.SM}px {S.MD}px; min-height: 36px;
+    padding: {S.XS}px {S.SM}px; min-height: 28px;
     selection-background-color: {C.ACCENT_MUTED};
 }}
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus {{
@@ -109,7 +109,7 @@ QPlainTextEdit[mono="true"] {{ font-family: '{T.FONT_MONO}', monospace; }}
 QComboBox {{
     background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY};
     border: 1px solid {C.BORDER}; border-radius: {R.MD}px;
-    padding: {S.SM}px {S.MD}px; min-height: 36px;
+    padding: {S.XS}px {S.SM}px; min-height: 28px;
 }}
 QComboBox:focus {{ border-color: {C.BORDER_FOCUS}; }}
 QComboBox:hover {{ border-color: {C.BORDER_STRONG}; }}
@@ -120,7 +120,7 @@ QComboBox QAbstractItemView {{
     selection-background-color: {C.ACCENT_MUTED}; selection-color: {C.TEXT_PRIMARY};
     outline: none;
 }}
-QComboBox QAbstractItemView::item {{ min-height: 32px; padding: 0 {S.MD}px; }}
+QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 0 {S.SM}px; }}
 
 /* ── Tables ────────────────────────────────────────────────────────────── */
 QTableView {{
@@ -155,7 +155,7 @@ QPushButton[class="nav-item"] {{
     background-color: transparent; color: {C.TEXT_SECONDARY}; text-align: left;
     padding: 0 {S.MD}px; border-radius: {R.MD}px;
     font-size: {T.SIZE_MD}px; font-weight: {T.WEIGHT_MEDIUM};
-    min-height: 44px; border-left: 3px solid transparent;
+    min-height: 38px; border-left: 3px solid transparent;
 }}
 QPushButton[class="nav-item"]:hover {{ background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY}; }}
 QPushButton[class="nav-item"][active="true"] {{
