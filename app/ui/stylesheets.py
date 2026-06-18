@@ -93,16 +93,18 @@ QPushButton[variant="icon"]:pressed {{ background-color: {C.BG_OVERLAY}; }}
 QPushButton[variant="icon"]:disabled {{ color: {C.TEXT_DISABLED}; }}
 
 /* ── Inputs ────────────────────────────────────────────────────────────── */
-QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox {{
+QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDateTimeEdit, QDateEdit, QTimeEdit {{
     background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY};
     border: 1px solid {C.BORDER}; border-radius: {R.MD}px;
     padding: {S.XS}px {S.SM}px; min-height: 28px;
     selection-background-color: {C.ACCENT_MUTED};
 }}
-QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus {{
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus,
+QDateTimeEdit:focus, QDateEdit:focus, QTimeEdit:focus {{
     border-color: {C.BORDER_FOCUS};
 }}
-QLineEdit:disabled, QTextEdit:disabled, QSpinBox:disabled {{
+QLineEdit:disabled, QTextEdit:disabled, QSpinBox:disabled,
+QDateTimeEdit:disabled, QDateEdit:disabled, QTimeEdit:disabled {{
     background-color: {C.BG_SURFACE}; color: {C.TEXT_DISABLED};
 }}
 QLineEdit[state="error"] {{ border-color: {C.ERROR}; }}
@@ -127,7 +129,7 @@ QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 0 {S.SM}px; }}
 
 /* ── Tables ────────────────────────────────────────────────────────────── */
 QTableView {{
-    background-color: {C.BG_SURFACE}; alternate-background-color: {C.BG_BASE};
+    background-color: {C.BG_SURFACE}; alternate-background-color: {C.BG_ELEVATED};
     gridline-color: {C.BORDER}; border: 1px solid {C.BORDER}; border-radius: {R.LG}px;
     selection-background-color: {C.ACCENT_MUTED}; selection-color: {C.TEXT_PRIMARY};
     outline: none;
@@ -143,6 +145,22 @@ QHeaderView::section {{
 }}
 QHeaderView::section:hover {{ background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY}; }}
 QTableCornerButton::section {{ background-color: {C.BG_SURFACE}; border: none; }}
+
+/* ── Lists ─────────────────────────────────────────────────────────────── */
+QListView, QListWidget {{
+    background-color: {C.BG_SURFACE}; color: {C.TEXT_PRIMARY};
+    border: 1px solid {C.BORDER}; border-radius: {R.MD}px;
+    outline: none;
+}}
+QListView::item, QListWidget::item {{
+    padding: {S.XS}px {S.SM}px; border-radius: {R.SM}px; color: {C.TEXT_PRIMARY};
+}}
+QListView::item:hover, QListWidget::item:hover {{ background-color: {C.BG_ELEVATED}; }}
+QListView::item:selected, QListWidget::item:selected {{
+    background-color: {C.ACCENT_MUTED}; color: {C.TEXT_PRIMARY};
+}}
+/* Custom item-widget rows are transparent so the list surface shows through. */
+QWidget[class="list-row"] {{ background: transparent; }}
 
 /* ── Frames / cards / sidebar ──────────────────────────────────────────── */
 QFrame[class="card"] {{

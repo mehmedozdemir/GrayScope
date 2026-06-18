@@ -331,6 +331,7 @@ class QueriesPage(QWidget):
 
     def _list_row(self, query: Query) -> QWidget:
         row = QWidget()
+        row.setProperty("class", "list-row")
         layout = QVBoxLayout(row)
         layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
         layout.setSpacing(Spacing.XS)
