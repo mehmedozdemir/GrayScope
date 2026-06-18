@@ -19,9 +19,10 @@ from app.data.models.graylog_profile import GraylogProfile
 from app.data.models.query import Query, TimeRangeType
 from app.integrations.graylog.client import GraylogClient
 
-# A parameter is {Identifier}; restricted to identifier chars so Lucene ranges
-# like {1 TO 5} are not mistaken for parameters.
-PARAM_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+# A parameter is {Identifier} with an optional ":defaultValue", e.g. {NetworkId}
+# or {region:TR-34}. Identifier-only names keep Lucene ranges like {1 TO 5} from
+# being mistaken for parameters.
+PARAM_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)(?::([^{}]*))?\}")
 
 
 @dataclass
@@ -30,14 +31,19 @@ class ExecutionResult:
     rows: list[dict[str, str]]
 
 
-def extract_parameters(template: str) -> list[str]:
-    """Distinct parameter names found in ``template``, in order of first appearance."""
-    seen: list[str] = []
+def extract_parameters(template: str) -> list[tuple[str, str]]:
+    """Distinct ``(name, default)`` parameters in ``template``, in first-seen order.
+
+    ``default`` is "" when the token has no ``:defaultValue`` part.
+    """
+    defaults: dict[str, str] = {}
+    order: list[str] = []
     for match in PARAM_RE.finditer(template or ""):
         name = match.group(1)
-        if name not in seen:
-            seen.append(name)
-    return seen
+        if name not in defaults:
+            defaults[name] = match.group(2) or ""
+            order.append(name)
+    return [(name, defaults[name]) for name in order]
 
 
 def _build_query_string(template: str, params: dict[str, str]) -> str:

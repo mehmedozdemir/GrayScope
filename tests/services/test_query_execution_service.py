@@ -28,12 +28,20 @@ def _query(**overrides) -> Query:
 
 def test_extract_parameters_distinct_in_order():
     template = "a:{NetworkId} b:{samId} c:{NetworkId}"
-    assert extract_parameters(template) == ["NetworkId", "samId"]
+    assert extract_parameters(template) == [("NetworkId", ""), ("samId", "")]
+
+
+def test_extract_parameters_with_defaults():
+    assert extract_parameters("a:{region:TR-34} b:{x}") == [("region", "TR-34"), ("x", "")]
 
 
 def test_extract_parameters_ignores_lucene_ranges():
     # {1 TO 5} is not an identifier, so it is not treated as a parameter.
     assert extract_parameters("age:{1 TO 5}") == []
+
+
+def test_build_query_string_replaces_token_with_default_syntax():
+    assert _build_query_string("a:{region:TR-34}", {"region": "TR-99"}) == "a:TR-99"
 
 
 def test_build_query_string_substitutes_named_params():
