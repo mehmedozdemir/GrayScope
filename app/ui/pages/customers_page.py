@@ -120,8 +120,8 @@ class CustomersPage(QWidget):
         self._customers: list[Customer] = []
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(Spacing.XL, Spacing.XL, Spacing.XL, Spacing.XL)
-        layout.setSpacing(Spacing.LG)
+        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        layout.setSpacing(Spacing.MD)
 
         layout.addWidget(self._build_header())
         self._panel = TablePanel(
