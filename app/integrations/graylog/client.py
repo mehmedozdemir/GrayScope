@@ -83,17 +83,18 @@ class GraylogClient:
         fields: list[str],
         size: int,
     ) -> list[dict[str, str]]:
-        """Run a message search via POST /search/messages (Graylog 5.1 Scripting API).
+        """Run a message search via POST /search/messages (Graylog 5.x Scripting API).
 
-        The endpoint returns CSV; rows are parsed into field→value dicts and
-        truncated to ``size`` client-side (the export endpoint has no native limit).
-        Response-shape assumption documented in PROJECT_PLAN.md §3.2 / §8.
+        Request/response shape verified against Graylog 5.2.12: the body uses
+        ``query`` / ``fields`` / ``size``, and the CSV header columns come back
+        prefixed with ``"field: "`` (stripped here so keys match ``fields``).
         """
         body = {
+            "query": query_string,
             "streams": streams,
             "timerange": timerange,
-            "query_string": {"type": "elasticsearch", "query_string": query_string},
-            "fields_in_order": fields,
+            "fields": fields,
+            "size": size,
         }
         response = self._request("POST", "/search/messages", accept="text/csv", json=body)
         response.raise_for_status()
@@ -101,10 +102,9 @@ class GraylogClient:
         import csv
         import io
 
-        reader = csv.DictReader(io.StringIO(response.text))
-        rows: list[dict[str, str]] = []
-        for index, row in enumerate(reader):
-            if index >= size:
-                break
-            rows.append(row)
-        return rows
+        reader = csv.reader(io.StringIO(response.text))
+        try:
+            header = [column.removeprefix("field: ") for column in next(reader)]
+        except StopIteration:
+            return []
+        return [dict(zip(header, row)) for row in reader]

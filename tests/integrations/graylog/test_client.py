@@ -42,8 +42,9 @@ def test_timeout_raises_timeout_error():
         _client(handler).test_connection()
 
 
-def test_execute_search_parses_csv_and_truncates_to_size():
-    csv_body = "timestamp,StatusCode\n2026-01-01,500\n2026-01-02,404\n2026-01-03,502\n"
+def test_execute_search_parses_csv_and_strips_field_prefix():
+    # Graylog returns CSV headers prefixed with "field: " (verified on 5.2.12).
+    csv_body = '"field: timestamp","field: StatusCode"\n2026-01-01,500\n2026-01-02,404\n'
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, text=csv_body)
@@ -53,8 +54,8 @@ def test_execute_search_parses_csv_and_truncates_to_size():
         streams=["s1"],
         timerange={"type": "relative", "range": 300},
         fields=["timestamp", "StatusCode"],
-        size=2,
+        size=150,
     )
 
-    assert len(rows) == 2  # truncated from 3
+    assert len(rows) == 2
     assert rows[0] == {"timestamp": "2026-01-01", "StatusCode": "500"}
