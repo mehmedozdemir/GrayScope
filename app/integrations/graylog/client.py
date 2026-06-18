@@ -94,8 +94,9 @@ class GraylogClient:
             "streams": streams,
             "timerange": timerange,
             "fields": fields,
-            "size": size,
         }
+        if size and size > 0:
+            body["size"] = size  # size <= 0 → omit limit, fetch all matching messages
         response = self._request("POST", "/search/messages", accept="text/csv", json=body)
         response.raise_for_status()
 
