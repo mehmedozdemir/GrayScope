@@ -8,6 +8,10 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
 ## [Unreleased]
 
 ### Added
+- Relative tarih aralığı için sayı + birim seçici (dakika/saat/gün/hafta/ay/yıl);
+  sorgu tanımlama formunda ve çalıştırma ekranında (stream badge'lerinin yanında)
+  düzenlenebilir olarak gösterilir. Değişiklik kaydedilmez, sadece o çalıştırma için
+  geçerlidir. Örn. 5 dakika, 2 saat, 7 gün gibi okunabilir giriş.
 - Adlandırılmış sorgu parametreleri: sorgu metnindeki her `{paramAdı}` bir parametre
   olur; çalıştırma ekranında her parametre için (adı etiketli) yan yana bir giriş alanı
   çıkar. Eski `{Plaka}` → `{NetworkId}` olarak yeniden adlandırıldı (mevcut kayıtlar
