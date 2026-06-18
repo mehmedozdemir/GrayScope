@@ -174,6 +174,11 @@ QTreeView::item:selected, QTreeWidget::item:selected {{
     background-color: {C.ACCENT_MUTED}; color: {C.TEXT_PRIMARY};
 }}
 
+/* ── Master panel (query tree side) — distinct surface vs the right area ── */
+QFrame[class="master-panel"] {{
+    background-color: {C.BG_SURFACE}; border: none; border-right: 1px solid {C.BORDER};
+}}
+
 /* ── Run panel (parameters strip) — no fill, just a separator ──────────── */
 QFrame[class="run-panel"] {{ background: transparent; border: none; }}
 
