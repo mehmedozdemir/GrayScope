@@ -1,0 +1,46 @@
+# --- GrayScope ---
+
+# Local runtime SQLite database (created at runtime, never committed)
+# Anchored to repo root so source packages app/data and tests/data are NOT ignored.
+/data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Fernet encryption key (must NEVER be committed)
+secret.key
+.grayscope/
+
+# Environment files (only .env.example is committed)
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.installed.cfg
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
