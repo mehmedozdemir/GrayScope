@@ -31,6 +31,9 @@ QMainWindow, QDialog {{ background-color: {C.BG_BASE}; }}
 QLabel[class="page-title"] {{
     font-size: {T.SIZE_2XL}px; font-weight: {T.WEIGHT_BOLD}; color: {C.TEXT_PRIMARY};
 }}
+QLabel[class="detail-title"] {{
+    font-size: {T.SIZE_XL}px; font-weight: {T.WEIGHT_SEMIBOLD}; color: {C.TEXT_PRIMARY};
+}}
 QLabel[class="section-header"] {{
     font-size: {T.SIZE_SM}px; font-weight: {T.WEIGHT_SEMIBOLD};
     color: {C.TEXT_SECONDARY}; letter-spacing: 0.8px;
@@ -131,6 +134,7 @@ QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 0 {S.SM}px; }}
 QTableView {{
     background-color: {C.BG_SURFACE}; alternate-background-color: {C.BG_ELEVATED};
     gridline-color: {C.BORDER}; border: 1px solid {C.BORDER}; border-radius: {R.LG}px;
+    font-size: {T.SIZE_SM}px;
     selection-background-color: {C.ACCENT_MUTED}; selection-color: {C.TEXT_PRIMARY};
     outline: none;
 }}
@@ -186,6 +190,7 @@ QFrame[class="run-panel"] {{ background: transparent; border: none; }}
 QLineEdit[class="plain-input"] {{
     background: transparent;
     font-family: 'JetBrains Mono', '{T.FONT_MONO}', monospace;
+    font-size: {T.SIZE_SM}px;
 }}
 
 /* ── Frames / cards / sidebar ──────────────────────────────────────────── */

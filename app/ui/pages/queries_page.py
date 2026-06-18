@@ -44,7 +44,7 @@ from app.services.query_execution_service import ExecutionResult, execute_query
 from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.components.buttons import ghost_button, icon_button, primary_button
 from app.ui.components.dialogs import ConfirmDialog
-from app.ui.components.feedback import EmptyState, show_toast
+from app.ui.components.feedback import EmptyState, badge, show_toast
 from app.ui.components.inputs import SearchInput
 from app.ui.pages.query_form_dialog import QueryFormDialog
 from app.ui.pages.settings_dialog import SettingsDialog
@@ -218,7 +218,7 @@ class QueriesPage(QWidget):
 
         header = QHBoxLayout()
         self._title = QLabel()
-        self._title.setProperty("class", "page-title")
+        self._title.setProperty("class", "detail-title")
         self._edit_button = icon_button("✎", "Düzenle")
         self._delete_button = icon_button("🗑", "Sil")
         header.addWidget(self._title)
@@ -226,6 +226,13 @@ class QueriesPage(QWidget):
         header.addWidget(self._edit_button)
         header.addWidget(self._delete_button)
         layout.addLayout(header)
+
+        # Selected streams shown as small badges under the title.
+        self._streams_row = QWidget()
+        self._streams_layout = QHBoxLayout(self._streams_row)
+        self._streams_layout.setContentsMargins(0, 0, 0, 0)
+        self._streams_layout.setSpacing(Spacing.XS)
+        layout.addWidget(self._streams_row)
 
         # Run panel — a single card grouping parameters + run controls, set apart
         # from the result grid below. A thin separator divides the (optional)
@@ -473,9 +480,24 @@ class QueriesPage(QWidget):
         self._theme_button.setToolTip("Açık temaya geç" if is_dark else "Koyu temaya geç")
         self._table.viewport().update()
 
+    def _populate_stream_badges(self, query: Query) -> None:
+        while self._streams_layout.count():
+            item = self._streams_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        streams = self._streams_repo.get_by_query(query.Id)
+        if not streams:
+            self._streams_row.setVisible(False)
+            return
+        for stream in streams:
+            self._streams_layout.addWidget(badge(stream.StreamName, "muted"))
+        self._streams_layout.addStretch()
+        self._streams_row.setVisible(True)
+
     def _show_detail(self, query: Query) -> None:
         self._detail_stack.setCurrentIndex(1)
         self._title.setText(query.Name)
+        self._populate_stream_badges(query)
 
         # Pre-fill the editable run controls from the saved query (single-line view).
         self._query_input.setText(query.QueryTemplate.replace("\n", " "))
