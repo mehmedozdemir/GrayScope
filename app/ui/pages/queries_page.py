@@ -221,10 +221,12 @@ class QueriesPage(QWidget):
         self._title = QLabel()
         self._title.setProperty("class", "detail-title")
         self._edit_button = icon_button("✎", "Düzenle")
+        self._copy_button = icon_button("⧉", "Kopyala (çoğalt)")
         self._delete_button = icon_button("🗑", "Sil")
         header.addWidget(self._title)
         header.addStretch()
         header.addWidget(self._edit_button)
+        header.addWidget(self._copy_button)
         header.addWidget(self._delete_button)
         layout.addLayout(header)
 
@@ -345,6 +347,7 @@ class QueriesPage(QWidget):
         self._settings_button.clicked.connect(self._open_settings)
         self._theme_button.clicked.connect(self._toggle_theme)
         self._edit_button.clicked.connect(self._on_edit)
+        self._copy_button.clicked.connect(self._on_copy)
         self._delete_button.clicked.connect(self._on_delete)
         self._customer_combo.currentIndexChanged.connect(self._update_run_enabled)
         self._run_button.clicked.connect(self._on_run)
@@ -445,6 +448,8 @@ class QueriesPage(QWidget):
                 menu.addAction("Sil", lambda: self._delete_folder(ident))
             else:
                 menu.addAction("Düzenle", self._on_edit)
+                menu.addAction("Kopyala", lambda qid=ident: self._copy_query(qid))
+                menu.addSeparator()
                 menu.addAction("Sil", self._on_delete)
         menu.exec(self._tree.viewport().mapToGlobal(pos))
 
@@ -585,6 +590,33 @@ class QueriesPage(QWidget):
         show_toast(self, "Sorgu güncellendi.", "success")
         self.load_data()
         self._reselect(updated.Id)
+
+    def _on_copy(self) -> None:
+        if self._selected is not None:
+            self._copy_query(self._selected.Id)
+
+    def _unique_copy_name(self, base: str) -> str:
+        existing = {q.Name for q in self._queries}
+        candidate = f"{base} (kopya)"
+        index = 2
+        while candidate in existing:
+            candidate = f"{base} (kopya {index})"
+            index += 1
+        return candidate
+
+    def _copy_query(self, query_id: int) -> None:
+        """Duplicate a query (with its streams and folder) under a new unique name."""
+        original = next((q for q in self._queries if q.Id == query_id), None)
+        if original is None:
+            return
+        new_query = replace(original, Id=None, Name=self._unique_copy_name(original.Name))
+        created = self._queries_repo.create(new_query)
+        self._streams_repo.replace_for_query(
+            created.Id, self._streams_repo.get_by_query(original.Id)
+        )
+        show_toast(self, "Sorgu kopyalandı.", "success")
+        self.load_data()
+        self._reselect(created.Id)
 
     def _on_delete(self) -> None:
         if self._selected is None:
