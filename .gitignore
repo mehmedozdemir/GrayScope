@@ -32,6 +32,10 @@ venv/
 env/
 ENV/
 
+# Local run logs (manual launch diagnostics)
+*.log
+.run_*.log
+
 # Test / coverage artifacts
 .pytest_cache/
 .coverage
