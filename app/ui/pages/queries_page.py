@@ -8,7 +8,6 @@ from PySide6.QtCore import QSortFilterProxyModel, Qt, QThread, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QComboBox,
-    QCompleter,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -150,12 +149,9 @@ class QueriesPage(QWidget):
         self._customer_label.setProperty("class", "field-label")
         self._customer_combo = QComboBox()
         self._customer_combo.setMinimumWidth(240)
-        self._customer_combo.setEditable(True)  # search-enabled (DESIGN_SYSTEM §3)
-        self._customer_combo.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self._customer_combo.completer().setCompletionMode(
-            QCompleter.CompletionMode.PopupCompletion
-        )
-        self._customer_combo.completer().setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        # Non-editable: clicking opens the full city list; typing jumps to a match.
+        # (An editable combo only opens via the arrow / filters on type, which read
+        # as an empty, unclickable box.)
         self._run_button = primary_button("Çalıştır")
         run_layout.addWidget(self._customer_label)
         run_layout.addWidget(self._customer_combo)
