@@ -36,7 +36,6 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
   (seçili sorgunun değeriyle dolar, kaydetmeden geçici düzenleyip yeniden çalıştırılabilir)
   ve **kayıt sayısı** alanı (seçili sorgunun değeriyle dolar; **0 = tüm kayıtlar**).
   Müşteri seçici kendi satırına alındı.
-- Tüm UI fontu **JetBrains Mono** (sistemde yoksa varsayılan fonta düşer).
 - Sorgular ekranı: sonuç grid'inin altında sabit **full-text arama** kutusu — yazdıkça
   içeriğinde aranan değeri geçen hücreler vurgu rengiyle (amber) işaretlenir
   (filtrelemez, vurgular). `*` ve `?` joker karakterleri desteklenir. Vurgu, QSS'i
