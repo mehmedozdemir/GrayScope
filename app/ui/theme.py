@@ -52,8 +52,8 @@ class Spacing:
 
 
 class Typography:
-    FONT_FAMILY = "Inter"  # Falls back to Segoe UI on Windows.
-    FONT_MONO = "Consolas"  # Query text / monospace contexts (DESIGN_SYSTEM.md §4).
+    FONT_FAMILY = "JetBrains Mono"  # Whole-UI font; falls back to system default if absent.
+    FONT_MONO = "JetBrains Mono"  # Query text / monospace contexts (DESIGN_SYSTEM.md §4).
 
     SIZE_XS = 10
     SIZE_SM = 12

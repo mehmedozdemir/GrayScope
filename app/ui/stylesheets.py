@@ -106,7 +106,7 @@ QLineEdit:disabled, QTextEdit:disabled, QSpinBox:disabled {{
     background-color: {C.BG_SURFACE}; color: {C.TEXT_DISABLED};
 }}
 QLineEdit[state="error"] {{ border-color: {C.ERROR}; }}
-QPlainTextEdit[mono="true"] {{ font-family: '{T.FONT_MONO}', monospace; }}
+QPlainTextEdit[mono="true"] {{ font-family: '{T.FONT_MONO}', 'Consolas', monospace; }}
 
 /* ── ComboBox ──────────────────────────────────────────────────────────── */
 QComboBox {{
@@ -254,8 +254,12 @@ def apply_theme(app) -> None:
 
 
 def make_font_default(typo):
-    from PySide6.QtGui import QFont
+    from PySide6.QtGui import QFont, QFontDatabase
 
-    font = QFont(typo.FONT_FAMILY)
+    # Use JetBrains Mono if installed; otherwise keep the system default family.
+    if typo.FONT_FAMILY in QFontDatabase.families():
+        font = QFont(typo.FONT_FAMILY)
+    else:
+        font = QFont()
     font.setPixelSize(typo.SIZE_MD)
     return font
