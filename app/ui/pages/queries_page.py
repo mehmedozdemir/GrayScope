@@ -45,6 +45,7 @@ from app.services.query_execution_service import (
 from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.components.buttons import ghost_button, icon_button, primary_button
 from app.ui.components.cell_value_dialog import CellValueDialog
+from app.ui.components.relative_range_widget import RelativeRangeWidget
 from app.ui.components.dialogs import ConfirmDialog
 from app.ui.components.feedback import EmptyState, badge, show_toast
 from app.ui.components.inputs import SearchInput, labeled_field
@@ -230,12 +231,23 @@ class QueriesPage(QWidget):
         header.addWidget(self._delete_button)
         layout.addLayout(header)
 
-        # Selected streams shown as small badges under the title.
-        self._streams_row = QWidget()
-        self._streams_layout = QHBoxLayout(self._streams_row)
+        # Info/control row: stream badges (left) + relative range widget (right).
+        self._info_row = QWidget()
+        info_layout = QHBoxLayout(self._info_row)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(Spacing.SM)
+
+        self._streams_layout = QHBoxLayout()
         self._streams_layout.setContentsMargins(0, 0, 0, 0)
         self._streams_layout.setSpacing(Spacing.XS)
-        layout.addWidget(self._streams_row)
+        info_layout.addLayout(self._streams_layout)
+        info_layout.addStretch()
+
+        self._range_widget = RelativeRangeWidget()
+        self._range_widget.setToolTip("Sorgu tarih aralığı (geçici, kaydedilmez)")
+        info_layout.addWidget(self._range_widget)
+
+        layout.addWidget(self._info_row)
 
         # Run panel — a single card grouping parameters + run controls, set apart
         # from the result grid below. A thin separator divides the (optional)
@@ -494,14 +506,8 @@ class QueriesPage(QWidget):
             item = self._streams_layout.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        streams = self._streams_repo.get_by_query(query.Id)
-        if not streams:
-            self._streams_row.setVisible(False)
-            return
-        for stream in streams:
+        for stream in self._streams_repo.get_by_query(query.Id):
             self._streams_layout.addWidget(badge(stream.StreamName, "muted"))
-        self._streams_layout.addStretch()
-        self._streams_row.setVisible(True)
 
     def _show_detail(self, query: Query) -> None:
         self._detail_stack.setCurrentIndex(1)
@@ -514,6 +520,12 @@ class QueriesPage(QWidget):
         self._query_input.setText(query.QueryTemplate.replace("\n", " "))
         self._query_input.blockSignals(False)
         self._count_spin.setValue(query.ResultSize)
+
+        from app.data.models.query import TimeRangeType as _TRT
+        is_relative = query.TimeRangeType is _TRT.RELATIVE
+        self._range_widget.setVisible(is_relative)
+        if is_relative:
+            self._range_widget.set_seconds(query.TimeRangeRangeSeconds or 3600)
 
         self._rebuild_params(preserve=False)  # selection → reset to parameter defaults
         self._results.setCurrentIndex(_RESULT_IDLE)
@@ -670,13 +682,16 @@ class QueriesPage(QWidget):
         stream_ids = [qs.StreamId for qs in self._streams_repo.get_by_query(self._selected.Id)]
         params = {name: field.text().strip() for name, field in self._param_fields.items()}
 
-        # Ad-hoc overrides from the run row (not persisted): edited query text and
-        # record count (0 = all). Empty text falls back to "*" (match all).
-        effective = replace(
-            self._selected,
+        # Ad-hoc overrides from the run row (not persisted): edited query text,
+        # record count (0 = all), and relative time range if shown.
+        from app.data.models.query import TimeRangeType as _TRT
+        overrides: dict = dict(
             QueryTemplate=self._query_input.text().strip() or "*",
             ResultSize=self._count_spin.value(),
         )
+        if self._selected.TimeRangeType is _TRT.RELATIVE:
+            overrides["TimeRangeRangeSeconds"] = self._range_widget.seconds()
+        effective = replace(self._selected, **overrides)
 
         self._results.setCurrentIndex(_RESULT_LOADING)
         self._run_button.setEnabled(False)

@@ -33,6 +33,7 @@ from app.services.query_execution_service import extract_parameters
 from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.components.buttons import icon_button, primary_button, secondary_button
 from app.ui.components.inputs import ChipInput, SearchInput, labeled_field
+from app.ui.components.relative_range_widget import RelativeRangeWidget
 from app.ui.theme import Spacing
 
 
@@ -203,11 +204,8 @@ class QueryFormDialog(QDialog):
 
         relative = QWidget()
         rl = QVBoxLayout(relative)
-        self._relative_seconds = QSpinBox()
-        self._relative_seconds.setRange(1, 2_592_000)
-        self._relative_seconds.setValue(3600)
-        self._relative_seconds.setSuffix(" sn")
-        rl.addWidget(labeled_field("Son N saniye", self._relative_seconds))
+        self._relative_range = RelativeRangeWidget()
+        rl.addWidget(labeled_field("Tarih aralığı", self._relative_range))
         self._timerange_tabs.addTab(relative, "Relative")
 
         absolute = QWidget()
@@ -380,7 +378,7 @@ class QueryFormDialog(QDialog):
 
         if query.TimeRangeType is TimeRangeType.RELATIVE:
             self._timerange_tabs.setCurrentIndex(0)
-            self._relative_seconds.setValue(query.TimeRangeRangeSeconds or 3600)
+            self._relative_range.set_seconds(query.TimeRangeRangeSeconds or 3600)
         elif query.TimeRangeType is TimeRangeType.ABSOLUTE:
             self._timerange_tabs.setCurrentIndex(1)
         else:
@@ -428,7 +426,7 @@ class QueryFormDialog(QDialog):
             UsesCustomerParameter=bool(extract_parameters(template)),
             QueryTemplate=template,
             TimeRangeType=time_type,
-            TimeRangeRangeSeconds=self._relative_seconds.value() if tab == 0 else None,
+            TimeRangeRangeSeconds=self._relative_range.seconds() if tab == 0 else None,
             TimeRangeFrom=self._absolute_from.dateTime().toPython() if tab == 1 else None,
             TimeRangeTo=self._absolute_to.dateTime().toPython() if tab == 1 else None,
             TimeRangeKeyword=self._keyword.text().strip() if tab == 2 else None,
