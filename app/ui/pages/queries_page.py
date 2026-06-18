@@ -243,10 +243,6 @@ class QueriesPage(QWidget):
         info_layout.addLayout(self._streams_layout)
         info_layout.addStretch()
 
-        self._range_widget = RelativeRangeWidget()
-        self._range_widget.setToolTip("Sorgu tarih aralığı (geçici, kaydedilmez)")
-        info_layout.addWidget(self._range_widget)
-
         layout.addWidget(self._info_row)
 
         # Run panel — a single card grouping parameters + run controls, set apart
@@ -293,6 +289,10 @@ class QueriesPage(QWidget):
 
         self._run_button = primary_button("▶  Çalıştır")
 
+        self._range_widget = RelativeRangeWidget()
+        self._range_widget.setToolTip("Sorgu tarih aralığı (geçici, kaydedilmez)")
+
+        run_layout.addWidget(self._range_widget)
         run_layout.addWidget(self._query_input, 1)
         run_layout.addWidget(count_label)
         run_layout.addWidget(self._count_spin)
