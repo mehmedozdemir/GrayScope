@@ -159,7 +159,8 @@ class QueriesPage(QWidget):
 
     # ── master (left) ───────────────────────────────────────────────────
     def _build_master(self) -> QWidget:
-        panel = QWidget()
+        panel = QFrame()
+        panel.setProperty("class", "master-panel")
         panel.setMinimumWidth(300)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
@@ -376,7 +377,7 @@ class QueriesPage(QWidget):
             if term and term not in query.Name.lower():
                 continue
             parent_item = folder_items.get(query.FolderId, root)
-            item = QTreeWidgetItem(parent_item, [query.Name])
+            item = QTreeWidgetItem(parent_item, [f"\U0001F50E  {query.Name}"])
             item.setData(0, _ROLE, ("query", query.Id))
             item.setToolTip(0, query.Name)
 
