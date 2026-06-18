@@ -43,6 +43,7 @@ from app.integrations.graylog.exceptions import GraylogError
 from app.services.query_execution_service import ExecutionResult, execute_query
 from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.components.buttons import ghost_button, icon_button, primary_button
+from app.ui.components.cell_value_dialog import CellValueDialog
 from app.ui.components.dialogs import ConfirmDialog
 from app.ui.components.feedback import EmptyState, badge, show_toast
 from app.ui.components.inputs import SearchInput
@@ -347,6 +348,15 @@ class QueriesPage(QWidget):
         self._delete_button.clicked.connect(self._on_delete)
         self._customer_combo.currentIndexChanged.connect(self._update_run_enabled)
         self._run_button.clicked.connect(self._on_run)
+        self._table.doubleClicked.connect(self._on_cell_double_clicked)
+
+    def _on_cell_double_clicked(self, index) -> None:
+        if not index.isValid():
+            return
+        value = str(index.data() or "")
+        field = self._proxy.headerData(index.column(), Qt.Orientation.Horizontal) or ""
+        dialog = CellValueDialog(str(field), value, self.window())
+        dialog.show()
 
     def load_data(self) -> None:
         self._queries = self._queries_repo.get_all()
