@@ -8,6 +8,8 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
 ## [Unreleased]
 
 ### Added
+- Sorgu kopyalama (çoğaltma): bir sorguyu stream'leri ve klasörüyle birlikte yeni
+  benzersiz adla kopyalama (sağ-tık "Kopyala" + detay başlığında kopya ikonu).
 - Grid hücresine çift tıklayınca değeri ayrı pencerede gösterme; JSON/XML/YAML
   formatlama, Markdown render, otomatik algılama ve kopyalama butonu (PyYAML eklendi).
 - Kapsamlı UI overhaul: sol sidebar kaldırıldı; sorgular en solda **ağaç yapısında**
