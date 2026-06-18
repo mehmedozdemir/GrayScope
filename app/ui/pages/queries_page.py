@@ -339,8 +339,12 @@ class QueriesPage(QWidget):
         self._edit_button.clicked.connect(self._on_edit)
         self._copy_button.clicked.connect(self._on_copy)
         self._delete_button.clicked.connect(self._on_delete)
-        self._query_input.textChanged.connect(self._rebuild_params)
+        self._query_input.textChanged.connect(self._on_query_text_changed)
         self._run_button.clicked.connect(self._on_run)
+
+    def _on_query_text_changed(self, _text: str = "") -> None:
+        # Live edit: keep already-entered values, only adding/removing fields.
+        self._rebuild_params(preserve=True)
         self._table.doubleClicked.connect(self._on_cell_double_clicked)
 
     def _on_cell_double_clicked(self, index) -> None:
@@ -505,21 +509,29 @@ class QueriesPage(QWidget):
         self._populate_stream_badges(query)
 
         # Pre-fill the editable run controls from the saved query (single-line view).
+        # Block signals so the param fields are rebuilt once, with their defaults.
+        self._query_input.blockSignals(True)
         self._query_input.setText(query.QueryTemplate.replace("\n", " "))
+        self._query_input.blockSignals(False)
         self._count_spin.setValue(query.ResultSize)
 
-        self._rebuild_params()
+        self._rebuild_params(preserve=False)  # selection → reset to parameter defaults
         self._results.setCurrentIndex(_RESULT_IDLE)
         self._set_grid_search_visible(False)
         self._update_run_enabled()
 
-    def _rebuild_params(self) -> None:
+    def _rebuild_params(self, preserve: bool = True) -> None:
         """Render one labeled input per {param} in the current query text.
 
-        Preserves already-entered values for parameters that still exist.
+        ``preserve`` keeps already-entered values (live editing); when False the
+        fields reset to their parameter defaults (used on query selection).
         """
         specs = extract_parameters(self._query_input.text())
-        previous = {name: field.text() for name, field in self._param_fields.items()}
+        previous = (
+            {name: field.text() for name, field in self._param_fields.items()}
+            if preserve
+            else {}
+        )
 
         while self._params_layout.count():
             item = self._params_layout.takeAt(0)
