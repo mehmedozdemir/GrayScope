@@ -50,6 +50,7 @@ class RelativeRangeWidget(QWidget):
         self._spin.setRange(1, 9_999)
         self._spin.setValue(1)
         self._spin.setFixedWidth(72)
+        self._spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
 
         self._unit = QComboBox()
         self._unit.addItems(_UNIT_LABELS)

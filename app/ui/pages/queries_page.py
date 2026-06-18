@@ -286,6 +286,7 @@ class QueriesPage(QWidget):
         self._count_spin.setSpecialValueText("Tümü")  # 0 → all records
         self._count_spin.setToolTip("Çekilecek kayıt sayısı (0 = tüm kayıtlar)")
         self._count_spin.setFixedWidth(96)
+        self._count_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
 
         self._run_button = primary_button("▶  Çalıştır")
 
@@ -353,11 +354,11 @@ class QueriesPage(QWidget):
         self._delete_button.clicked.connect(self._on_delete)
         self._query_input.textChanged.connect(self._on_query_text_changed)
         self._run_button.clicked.connect(self._on_run)
+        self._table.doubleClicked.connect(self._on_cell_double_clicked)
 
     def _on_query_text_changed(self, _text: str = "") -> None:
         # Live edit: keep already-entered values, only adding/removing fields.
         self._rebuild_params(preserve=True)
-        self._table.doubleClicked.connect(self._on_cell_double_clicked)
 
     def _on_cell_double_clicked(self, index) -> None:
         if not index.isValid():
@@ -365,7 +366,7 @@ class QueriesPage(QWidget):
         value = str(index.data() or "")
         field = self._proxy.headerData(index.column(), Qt.Orientation.Horizontal) or ""
         dialog = CellValueDialog(str(field), value, self.window())
-        dialog.show()
+        dialog.exec()
 
     def load_data(self) -> None:
         self._queries = self._queries_repo.get_all()
