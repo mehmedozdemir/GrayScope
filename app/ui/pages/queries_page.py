@@ -279,7 +279,7 @@ class QueriesPage(QWidget):
         self._count_spin.setToolTip("Çekilecek kayıt sayısı (0 = tüm kayıtlar)")
         self._count_spin.setFixedWidth(96)
 
-        self._run_button = primary_button("Çalıştır")
+        self._run_button = primary_button("▶  Çalıştır")
 
         run_layout.addWidget(self._query_input, 1)
         run_layout.addWidget(count_label)
@@ -518,7 +518,7 @@ class QueriesPage(QWidget):
 
         Preserves already-entered values for parameters that still exist.
         """
-        names = extract_parameters(self._query_input.text())
+        specs = extract_parameters(self._query_input.text())
         previous = {name: field.text() for name, field in self._param_fields.items()}
 
         while self._params_layout.count():
@@ -527,16 +527,17 @@ class QueriesPage(QWidget):
                 item.widget().deleteLater()
         self._param_fields = {}
 
-        for name in names:
+        for name, default in specs:
             field = QLineEdit()
             field.setMinimumWidth(140)
-            field.setText(previous.get(name, ""))
+            field.setText(previous.get(name, default))  # keep value, else use default
             field.textChanged.connect(self._update_run_enabled)
+            field.returnPressed.connect(self._run_button.click)  # Enter → Çalıştır
             self._param_fields[name] = field
             self._params_layout.addWidget(labeled_field(name, field))
         self._params_layout.addStretch()
 
-        has_params = bool(names)
+        has_params = bool(specs)
         self._params_row.setVisible(has_params)
         self._param_separator.setVisible(has_params)
         self._update_run_enabled()
