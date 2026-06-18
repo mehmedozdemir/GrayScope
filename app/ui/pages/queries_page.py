@@ -350,6 +350,7 @@ class QueriesPage(QWidget):
         worker.succeeded.connect(self._on_run_succeeded)
         worker.failed.connect(self._on_run_failed)
         worker.finished.connect(self._on_run_finished)
+        worker.finished.connect(worker.deleteLater)
         worker.start()
 
     def _on_run_succeeded(self, result: ExecutionResult) -> None:

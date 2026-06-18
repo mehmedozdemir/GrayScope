@@ -291,10 +291,18 @@ class QueryFormDialog(QDialog):
         worker.succeeded.connect(self._on_streams_loaded)
         worker.failed.connect(self._on_streams_failed)
         worker.finished.connect(self._clear_worker)
+        worker.finished.connect(worker.deleteLater)
         worker.start()
 
     def _clear_worker(self) -> None:
         self._worker = None
+
+    def done(self, result: int) -> None:
+        # Never let the dialog (and its child QThread) be destroyed while the
+        # stream-load thread is still running — that aborts the process.
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.wait(12000)
+        super().done(result)
 
     def _on_streams_loaded(self, streams: list) -> None:
         selected_ids = {qs.StreamId for qs in self._existing_streams}
