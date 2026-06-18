@@ -11,6 +11,7 @@ from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -195,20 +196,38 @@ class QueriesPage(QWidget):
         header.addWidget(self._delete_button)
         layout.addLayout(header)
 
-        # Customer selector — own row, shown only for parametric queries.
+        # Run panel — a single card grouping parameters + run controls, set apart
+        # from the result grid below. A thin separator divides the (optional)
+        # parameter area from the query/run row.
+        self._run_panel = QFrame()
+        self._run_panel.setProperty("class", "card")
+        panel_layout = QVBoxLayout(self._run_panel)
+        panel_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        panel_layout.setSpacing(Spacing.MD)
+
+        # Parameters area — shown only for parametric queries.
         self._customer_row = QWidget()
         customer_layout = QHBoxLayout(self._customer_row)
         customer_layout.setContentsMargins(0, 0, 0, 0)
         customer_layout.setSpacing(Spacing.SM)
-        self._customer_label = QLabel("Müşteri:")
+        params_label = QLabel("Parametreler")
+        params_label.setProperty("class", "section-header")
+        self._customer_label = QLabel("Şehir / Müşteri:")
         self._customer_label.setProperty("class", "field-label")
         self._customer_combo = QComboBox()
         self._customer_combo.setMinimumWidth(240)
         # Non-editable: clicking opens the full city list; typing jumps to a match.
+        customer_layout.addWidget(params_label)
+        customer_layout.addSpacing(Spacing.MD)
         customer_layout.addWidget(self._customer_label)
         customer_layout.addWidget(self._customer_combo)
         customer_layout.addStretch()
-        layout.addWidget(self._customer_row)
+        panel_layout.addWidget(self._customer_row)
+
+        self._param_separator = QFrame()
+        self._param_separator.setProperty("class", "separator")
+        self._param_separator.setFixedHeight(1)
+        panel_layout.addWidget(self._param_separator)
 
         # Run row: editable query text (widest) + record count + run button.
         self._run_row = QWidget()
@@ -234,7 +253,9 @@ class QueriesPage(QWidget):
         run_layout.addWidget(count_label)
         run_layout.addWidget(self._count_spin)
         run_layout.addWidget(self._run_button)
-        layout.addWidget(self._run_row)
+        panel_layout.addWidget(self._run_row)
+
+        layout.addWidget(self._run_panel)
 
         layout.addWidget(self._build_results(), 1)
 
@@ -349,6 +370,7 @@ class QueriesPage(QWidget):
 
         parametric = query.UsesCustomerParameter
         self._customer_row.setVisible(parametric)
+        self._param_separator.setVisible(parametric)
         if parametric:
             self._populate_customers()
         self._results.setCurrentIndex(_RESULT_IDLE)
