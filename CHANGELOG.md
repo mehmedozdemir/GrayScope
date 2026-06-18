@@ -8,6 +8,10 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
 ## [Unreleased]
 
 ### Added
+- Adlandırılmış sorgu parametreleri: sorgu metnindeki her `{paramAdı}` bir parametre
+  olur; çalıştırma ekranında her parametre için (adı etiketli) yan yana bir giriş alanı
+  çıkar. Eski `{Plaka}` → `{NetworkId}` olarak yeniden adlandırıldı (mevcut kayıtlar
+  otomatik migrate edilir); şehir seçici combo'su generic metin alanlarıyla değişti.
 - Sorgu kopyalama (çoğaltma): bir sorguyu stream'leri ve klasörüyle birlikte yeni
   benzersiz adla kopyalama (sağ-tık "Kopyala" + detay başlığında kopya ikonu).
 - Grid hücresine çift tıklayınca değeri ayrı pencerede gösterme; JSON/XML/YAML

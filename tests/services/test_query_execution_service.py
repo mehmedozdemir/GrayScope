@@ -4,9 +4,12 @@ from __future__ import annotations
 import pytest
 
 from app.core.exceptions import QueryValidationError
-from app.data.models.customer import Customer
 from app.data.models.query import Query, TimeRangeType
-from app.services.query_execution_service import _build_query_string, _build_timerange
+from app.services.query_execution_service import (
+    _build_query_string,
+    _build_timerange,
+    extract_parameters,
+)
 
 
 def _query(**overrides) -> Query:
@@ -14,7 +17,7 @@ def _query(**overrides) -> Query:
         Name="q",
         GraylogProfileId=1,
         UsesCustomerParameter=True,
-        QueryTemplate="NetworkId:{Plaka} AND NOT StatusCode:200",
+        QueryTemplate="NetworkId:{NetworkId} AND NOT StatusCode:200",
         TimeRangeType=TimeRangeType.RELATIVE,
         FieldsJson='["timestamp"]',
         TimeRangeRangeSeconds=3600,
@@ -23,20 +26,31 @@ def _query(**overrides) -> Query:
     return Query(**base)
 
 
-def test_placeholder_injection_replaces_plaka():
-    query = _query()
-    result = _build_query_string(query, Customer(NetworkId=34, Name="İstanbul"))
-    assert result == "NetworkId:34 AND NOT StatusCode:200"
+def test_extract_parameters_distinct_in_order():
+    template = "a:{NetworkId} b:{samId} c:{NetworkId}"
+    assert extract_parameters(template) == ["NetworkId", "samId"]
 
 
-def test_missing_customer_raises_validation_error():
+def test_extract_parameters_ignores_lucene_ranges():
+    # {1 TO 5} is not an identifier, so it is not treated as a parameter.
+    assert extract_parameters("age:{1 TO 5}") == []
+
+
+def test_build_query_string_substitutes_named_params():
+    template = "NetworkId:{NetworkId} AND service:{samId}"
+    result = _build_query_string(template, {"NetworkId": "34", "samId": "abc"})
+    assert result == "NetworkId:34 AND service:abc"
+
+
+def test_missing_or_empty_param_raises():
     with pytest.raises(QueryValidationError):
-        _build_query_string(_query(), None)
+        _build_query_string("x:{NetworkId}", {"NetworkId": ""})
+    with pytest.raises(QueryValidationError):
+        _build_query_string("x:{NetworkId}", {})
 
 
-def test_non_parametric_query_ignores_customer():
-    query = _query(UsesCustomerParameter=False, QueryTemplate="StatusCode:500")
-    assert _build_query_string(query, None) == "StatusCode:500"
+def test_template_without_params_is_unchanged():
+    assert _build_query_string("StatusCode:500", {}) == "StatusCode:500"
 
 
 def test_relative_timerange():
