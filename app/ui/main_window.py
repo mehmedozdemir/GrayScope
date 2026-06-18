@@ -5,10 +5,11 @@ import sqlite3
 
 from PySide6.QtWidgets import QHBoxLayout, QStackedWidget, QWidget
 
-from app.ui.components.feedback import EmptyState
+from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.components.navigation import Sidebar
 from app.ui.pages.customers_page import CustomersPage
 from app.ui.pages.graylog_profiles_page import GraylogProfilesPage
+from app.ui.pages.queries_page import QueriesPage
 
 # (glyph, label) in fixed display order (DESIGN_SYSTEM.md §2).
 _NAV_ITEMS = [
@@ -31,15 +32,10 @@ class MainWindow(QWidget):
 
         self._sidebar = Sidebar(_NAV_ITEMS)
         self._stack = QStackedWidget()
+        self._stream_service = StreamCatalogService()
 
-        # Index 0: Sorgular — built in the next increment.
-        self._stack.addWidget(
-            EmptyState(
-                "\U0001F50E",
-                "Sorgular",
-                "Bu ekran bir sonraki adımda eklenecek.",
-            )
-        )
+        # Index 0: Sorgular (default landing page)
+        self._stack.addWidget(QueriesPage(self._conn, self._stream_service))
         # Index 1: Müşteriler
         self._stack.addWidget(CustomersPage(self._conn))
         # Index 2: Graylog Profilleri

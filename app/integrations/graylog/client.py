@@ -30,10 +30,10 @@ class GraylogClient:
         self._timeout = timeout
         self._transport = transport  # injected only in tests
 
-    def _headers(self) -> dict[str, str]:
-        return {"Accept": "application/json", "X-Requested-By": REQUESTED_BY}
+    def _headers(self, accept: str = "application/json") -> dict[str, str]:
+        return {"Accept": accept, "X-Requested-By": REQUESTED_BY}
 
-    def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
+    def _request(self, method: str, path: str, accept: str = "application/json", **kwargs) -> httpx.Response:
         url = f"{self._base_url}/{path.lstrip('/')}"
         try:
             with httpx.Client(timeout=self._timeout, transport=self._transport) as client:
@@ -41,7 +41,7 @@ class GraylogClient:
                     method,
                     url,
                     auth=(self._token, "token"),  # Graylog token auth pattern.
-                    headers=self._headers(),
+                    headers=self._headers(accept),
                     **kwargs,
                 )
         except httpx.TimeoutException as exc:
@@ -74,3 +74,37 @@ class GraylogClient:
             StreamInfo(id=item["id"], title=item.get("title", item["id"]))
             for item in payload.get("streams", [])
         ]
+
+    def execute_search(
+        self,
+        query_string: str,
+        streams: list[str],
+        timerange: dict,
+        fields: list[str],
+        size: int,
+    ) -> list[dict[str, str]]:
+        """Run a message search via POST /search/messages (Graylog 5.1 Scripting API).
+
+        The endpoint returns CSV; rows are parsed into field→value dicts and
+        truncated to ``size`` client-side (the export endpoint has no native limit).
+        Response-shape assumption documented in PROJECT_PLAN.md §3.2 / §8.
+        """
+        body = {
+            "streams": streams,
+            "timerange": timerange,
+            "query_string": {"type": "elasticsearch", "query_string": query_string},
+            "fields_in_order": fields,
+        }
+        response = self._request("POST", "/search/messages", accept="text/csv", json=body)
+        response.raise_for_status()
+
+        import csv
+        import io
+
+        reader = csv.DictReader(io.StringIO(response.text))
+        rows: list[dict[str, str]] = []
+        for index, row in enumerate(reader):
+            if index >= size:
+                break
+            rows.append(row)
+        return rows
