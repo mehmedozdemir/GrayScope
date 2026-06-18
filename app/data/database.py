@@ -72,6 +72,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(Query)")}
     if "FolderId" not in columns:
         conn.execute("ALTER TABLE Query ADD COLUMN FolderId INTEGER")
+    # The legacy {Plaka} placeholder is now the named parameter {NetworkId}.
+    conn.execute(
+        "UPDATE Query SET QueryTemplate = REPLACE(QueryTemplate, '{Plaka}', '{NetworkId}')"
+    )
     conn.commit()
 
 

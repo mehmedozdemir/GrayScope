@@ -6,7 +6,6 @@ import json
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
-    QCheckBox,
     QComboBox,
     QDateTimeEdit,
     QDialog,
@@ -30,6 +29,7 @@ from app.data.models.query import Query, SortOrder, TimeRangeType
 from app.data.models.query_folder import QueryFolder
 from app.data.models.query_stream import QueryStream
 from app.integrations.graylog.exceptions import GraylogError
+from app.services.query_execution_service import extract_parameters
 from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.components.buttons import icon_button, primary_button, secondary_button
 from app.ui.components.inputs import ChipInput, SearchInput, labeled_field
@@ -140,27 +140,18 @@ class QueryFormDialog(QDialog):
                 self._folder_combo.setCurrentIndex(idx)
         form.addWidget(labeled_field("Klasör", self._folder_combo))
 
-        self._uses_customer = QCheckBox("Müşteri parametresi kullan")
-        form.addWidget(self._uses_customer)
-        self._customer_hint = QLabel(
-            "Sorgu metninde {Plaka} yazıp çalıştırma anında şehir seçtirebilirsiniz."
-        )
-        self._customer_hint.setProperty("class", "hint")
-        self._customer_hint.setWordWrap(True)
-        self._customer_hint.setVisible(False)
-        form.addWidget(self._customer_hint)
-
         self._query_text = QPlainTextEdit()
         self._query_text.setProperty("mono", "true")
-        self._query_text.setPlaceholderText("NetworkId:{Plaka} AND NOT StatusCode:200")
+        self._query_text.setPlaceholderText("NetworkId:{NetworkId} AND NOT StatusCode:200")
         self._query_text.setFixedHeight(96)
         form.addWidget(labeled_field("Sorgu metni", self._query_text, required=True))
-        self._placeholder_warning = QLabel(
-            "Uyarı: Müşteri parametresi açık ama sorgu metninde {Plaka} yok."
+        param_hint = QLabel(
+            "Parametre eklemek için sorgu metninde {parametreAdı} kullanın "
+            "(örn. {NetworkId}). Çalıştırma ekranında her parametre için bir giriş alanı çıkar."
         )
-        self._placeholder_warning.setProperty("class", "error-text")
-        self._placeholder_warning.setVisible(False)
-        form.addWidget(self._placeholder_warning)
+        param_hint.setProperty("class", "hint")
+        param_hint.setWordWrap(True)
+        form.addWidget(param_hint)
 
         form.addWidget(self._build_streams_section())
         form.addWidget(self._build_timerange_section())
@@ -279,21 +270,10 @@ class QueryFormDialog(QDialog):
 
     # ── behaviour ───────────────────────────────────────────────────────
     def _connect_signals(self) -> None:
-        self._uses_customer.toggled.connect(self._on_uses_customer_toggled)
-        self._query_text.textChanged.connect(self._update_placeholder_warning)
         self._fields.changed.connect(self._refresh_sort_options)
         self._profile_combo.currentIndexChanged.connect(self._reload_streams)
         self._stream_refresh.clicked.connect(self._reload_streams)
         self._stream_search.textChanged.connect(self._filter_streams)
-
-    def _on_uses_customer_toggled(self, checked: bool) -> None:
-        self._customer_hint.setVisible(checked)
-        self._update_placeholder_warning()
-
-    def _update_placeholder_warning(self) -> None:
-        needs = self._uses_customer.isChecked()
-        missing = "{Plaka}" not in self._query_text.toPlainText()
-        self._placeholder_warning.setVisible(needs and missing)
 
     def _refresh_sort_options(self) -> None:
         current = self._sort_field.currentText() if self._sort_field.count() else ""
@@ -391,7 +371,6 @@ class QueryFormDialog(QDialog):
         idx = self._profile_combo.findData(query.GraylogProfileId)
         if idx >= 0:
             self._profile_combo.setCurrentIndex(idx)
-        self._uses_customer.setChecked(query.UsesCustomerParameter)
         self._query_text.setPlainText(query.QueryTemplate)
         self._fields.set_values(json.loads(query.FieldsJson) if query.FieldsJson else [])
         self._result_size.setValue(query.ResultSize)
@@ -441,12 +420,13 @@ class QueryFormDialog(QDialog):
         if sort_field:
             sort_order = SortOrder.DESC if self._sort_desc.isChecked() else SortOrder.ASC
 
+        template = self._query_text.toPlainText().strip()
         return Query(
             Id=self._query.Id if self._query else None,
             Name=self._name.text().strip(),
             GraylogProfileId=self._profile_combo.currentData(),
-            UsesCustomerParameter=self._uses_customer.isChecked(),
-            QueryTemplate=self._query_text.toPlainText().strip(),
+            UsesCustomerParameter=bool(extract_parameters(template)),
+            QueryTemplate=template,
             TimeRangeType=time_type,
             TimeRangeRangeSeconds=self._relative_seconds.value() if tab == 0 else None,
             TimeRangeFrom=self._absolute_from.dateTime().toPython() if tab == 1 else None,

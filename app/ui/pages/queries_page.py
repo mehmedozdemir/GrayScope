@@ -10,7 +10,6 @@ from PySide6.QtCore import QSortFilterProxyModel, Qt, QThread, Signal
 from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
@@ -31,22 +30,24 @@ from PySide6.QtWidgets import (
 )
 
 from app.core.exceptions import GrayScopeError
-from app.data.models.customer import Customer
 from app.data.models.query import Query
 from app.data.models.query_folder import QueryFolder
-from app.data.repositories.customer_repository import CustomerRepository
 from app.data.repositories.graylog_profile_repository import GraylogProfileRepository
 from app.data.repositories.query_folder_repository import QueryFolderRepository
 from app.data.repositories.query_repository import QueryRepository
 from app.data.repositories.query_stream_repository import QueryStreamRepository
 from app.integrations.graylog.exceptions import GraylogError
-from app.services.query_execution_service import ExecutionResult, execute_query
+from app.services.query_execution_service import (
+    ExecutionResult,
+    execute_query,
+    extract_parameters,
+)
 from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.components.buttons import ghost_button, icon_button, primary_button
 from app.ui.components.cell_value_dialog import CellValueDialog
 from app.ui.components.dialogs import ConfirmDialog
 from app.ui.components.feedback import EmptyState, badge, show_toast
-from app.ui.components.inputs import SearchInput
+from app.ui.components.inputs import SearchInput, labeled_field
 from app.ui.pages.query_form_dialog import QueryFormDialog
 from app.ui.pages.settings_dialog import SettingsDialog
 from app.ui.theme import Colors, Spacing
@@ -64,9 +65,9 @@ class _ExecutionWorker(QThread):
     succeeded = Signal(object)  # ExecutionResult
     failed = Signal(str)
 
-    def __init__(self, profile, query, stream_ids, customer, parent=None) -> None:
+    def __init__(self, profile, query, stream_ids, params, parent=None) -> None:
         super().__init__(parent)
-        self._args = (profile, query, stream_ids, customer)
+        self._args = (profile, query, stream_ids, params)
 
     def run(self) -> None:
         try:
@@ -135,7 +136,6 @@ class QueriesPage(QWidget):
         self._queries_repo = QueryRepository(conn)
         self._profiles_repo = GraylogProfileRepository(conn)
         self._streams_repo = QueryStreamRepository(conn)
-        self._customers_repo = CustomerRepository(conn)
         self._folders_repo = QueryFolderRepository(conn)
         self._stream_service = stream_service
 
@@ -246,24 +246,14 @@ class QueriesPage(QWidget):
         panel_layout.setContentsMargins(0, 0, 0, 0)
         panel_layout.setSpacing(Spacing.SM)
 
-        # Parameters area — shown only for parametric queries.
-        self._customer_row = QWidget()
-        customer_layout = QHBoxLayout(self._customer_row)
-        customer_layout.setContentsMargins(0, 0, 0, 0)
-        customer_layout.setSpacing(Spacing.SM)
-        params_label = QLabel("Parametreler")
-        params_label.setProperty("class", "section-header")
-        self._customer_label = QLabel("Şehir / Müşteri:")
-        self._customer_label.setProperty("class", "field-label")
-        self._customer_combo = QComboBox()
-        self._customer_combo.setMinimumWidth(240)
-        # Non-editable: clicking opens the full city list; typing jumps to a match.
-        customer_layout.addWidget(params_label)
-        customer_layout.addSpacing(Spacing.MD)
-        customer_layout.addWidget(self._customer_label)
-        customer_layout.addWidget(self._customer_combo)
-        customer_layout.addStretch()
-        panel_layout.addWidget(self._customer_row)
+        # Parameters area — one labeled input per {param} in the query text,
+        # laid out side by side (label above each field). Built dynamically.
+        self._params_row = QWidget()
+        self._params_layout = QHBoxLayout(self._params_row)
+        self._params_layout.setContentsMargins(0, 0, 0, 0)
+        self._params_layout.setSpacing(Spacing.MD)
+        self._param_fields: dict[str, QLineEdit] = {}
+        panel_layout.addWidget(self._params_row)
 
         self._param_separator = QFrame()
         self._param_separator.setProperty("class", "separator")
@@ -349,7 +339,7 @@ class QueriesPage(QWidget):
         self._edit_button.clicked.connect(self._on_edit)
         self._copy_button.clicked.connect(self._on_copy)
         self._delete_button.clicked.connect(self._on_delete)
-        self._customer_combo.currentIndexChanged.connect(self._update_run_enabled)
+        self._query_input.textChanged.connect(self._rebuild_params)
         self._run_button.clicked.connect(self._on_run)
         self._table.doubleClicked.connect(self._on_cell_double_clicked)
 
@@ -518,33 +508,45 @@ class QueriesPage(QWidget):
         self._query_input.setText(query.QueryTemplate.replace("\n", " "))
         self._count_spin.setValue(query.ResultSize)
 
-        parametric = query.UsesCustomerParameter
-        self._customer_row.setVisible(parametric)
-        self._param_separator.setVisible(parametric)
-        if parametric:
-            self._populate_customers()
+        self._rebuild_params()
         self._results.setCurrentIndex(_RESULT_IDLE)
         self._set_grid_search_visible(False)
         self._update_run_enabled()
 
-    def _populate_customers(self) -> None:
-        self._customer_combo.blockSignals(True)
-        self._customer_combo.clear()
-        self._customer_combo.addItem("Seç…", None)
-        for customer in self._customers_repo.get_all(only_active=True):
-            self._customer_combo.addItem(f"{customer.NetworkId} — {customer.Name}", customer)
-        self._customer_combo.setCurrentIndex(0)
-        self._customer_combo.blockSignals(False)
+    def _rebuild_params(self) -> None:
+        """Render one labeled input per {param} in the current query text.
+
+        Preserves already-entered values for parameters that still exist.
+        """
+        names = extract_parameters(self._query_input.text())
+        previous = {name: field.text() for name, field in self._param_fields.items()}
+
+        while self._params_layout.count():
+            item = self._params_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._param_fields = {}
+
+        for name in names:
+            field = QLineEdit()
+            field.setMinimumWidth(140)
+            field.setText(previous.get(name, ""))
+            field.textChanged.connect(self._update_run_enabled)
+            self._param_fields[name] = field
+            self._params_layout.addWidget(labeled_field(name, field))
+        self._params_layout.addStretch()
+
+        has_params = bool(names)
+        self._params_row.setVisible(has_params)
+        self._param_separator.setVisible(has_params)
+        self._update_run_enabled()
 
     def _update_run_enabled(self) -> None:
         if self._selected is None:
             return
-        if self._selected.UsesCustomerParameter and self._customer_combo.currentData() is None:
-            self._run_button.setEnabled(False)
-            self._run_button.setToolTip("Önce bir müşteri/şehir seçin")
-        else:
-            self._run_button.setEnabled(True)
-            self._run_button.setToolTip("")
+        all_filled = all(field.text().strip() for field in self._param_fields.values())
+        self._run_button.setEnabled(all_filled)
+        self._run_button.setToolTip("" if all_filled else "Önce tüm parametreleri doldurun")
 
     # ── CRUD ─────────────────────────────────────────────────────────────
     def _active_profiles(self):
@@ -653,7 +655,7 @@ class QueriesPage(QWidget):
             show_toast(self, "Bu sorgunun profili bulunamadı.", "error")
             return
         stream_ids = [qs.StreamId for qs in self._streams_repo.get_by_query(self._selected.Id)]
-        customer: Customer | None = self._customer_combo.currentData()
+        params = {name: field.text().strip() for name, field in self._param_fields.items()}
 
         # Ad-hoc overrides from the run row (not persisted): edited query text and
         # record count (0 = all). Empty text falls back to "*" (match all).
@@ -666,7 +668,7 @@ class QueriesPage(QWidget):
         self._results.setCurrentIndex(_RESULT_LOADING)
         self._run_button.setEnabled(False)
 
-        worker = _ExecutionWorker(profile, effective, stream_ids, customer, self)
+        worker = _ExecutionWorker(profile, effective, stream_ids, params, self)
         self._worker = worker
         worker.succeeded.connect(self._on_run_succeeded)
         worker.failed.connect(self._on_run_failed)
