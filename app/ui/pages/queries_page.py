@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from PySide6.QtCore import QSortFilterProxyModel, Qt, QThread, Signal
+from PySide6.QtCore import QSize, QSortFilterProxyModel, Qt, QThread, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QComboBox,
@@ -82,7 +82,7 @@ class QueriesPage(QWidget):
         splitter.addWidget(self._build_detail())
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
-        splitter.setSizes([320, 960])
+        splitter.setSizes([400, 880])
         layout.addWidget(splitter)
 
         self._connect_signals()
@@ -91,7 +91,7 @@ class QueriesPage(QWidget):
     # ── master (left) ───────────────────────────────────────────────────
     def _build_master(self) -> QWidget:
         panel = QWidget()
-        panel.setMinimumWidth(280)
+        panel.setMinimumWidth(340)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
         layout.setSpacing(Spacing.SM)
@@ -214,7 +214,11 @@ class QueriesPage(QWidget):
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, query.Id)
             self._list.addItem(item)
-            self._list.setItemWidget(item, self._list_row(query))
+            row = self._list_row(query)
+            self._list.setItemWidget(item, row)
+            # Allow up to ~2 wrapped lines; longer names clip and reveal via tooltip.
+            hint = row.sizeHint()
+            item.setSizeHint(QSize(hint.width(), min(hint.height(), 72)))
         self._list.blockSignals(False)
 
     def _list_row(self, query: Query) -> QWidget:
@@ -223,6 +227,9 @@ class QueriesPage(QWidget):
         layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
         layout.setSpacing(Spacing.XS)
         name = QLabel(query.Name)
+        name.setProperty("class", "query-name")
+        name.setWordWrap(True)
+        name.setToolTip(query.Name)
         profile = self._profiles_by_id.get(query.GraylogProfileId)
         profile_badge = badge(profile.Name if profile else "—", "muted")
         badge_row = QHBoxLayout()
