@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 from app.core.config import DEFAULT_RESULT_SIZE
 from app.data.models.graylog_profile import GraylogProfile
 from app.data.models.query import Query, SortOrder, TimeRangeType
+from app.data.models.query_folder import QueryFolder
 from app.data.models.query_stream import QueryStream
 from app.integrations.graylog.exceptions import GraylogError
 from app.services.stream_catalog_service import StreamCatalogService
@@ -64,12 +65,16 @@ class QueryFormDialog(QDialog):
         stream_service: StreamCatalogService,
         query: Query | None = None,
         existing_streams: list[QueryStream] | None = None,
+        folders: list[QueryFolder] | None = None,
+        default_folder_id: int | None = None,
     ) -> None:
         super().__init__(parent)
         self._profiles = profiles
         self._stream_service = stream_service
         self._query = query
         self._existing_streams = existing_streams or []
+        self._folders = folders or []
+        self._default_folder_id = default_folder_id
         self._worker: _StreamLoadWorker | None = None
 
         self.setWindowTitle("Sorguyu Düzenle" if query else "Yeni Sorgu")
@@ -98,6 +103,21 @@ class QueryFormDialog(QDialog):
         self._connect_signals()
         self._reload_streams()
 
+    def _ordered_folders(self) -> list[tuple[QueryFolder, int]]:
+        """Folders in hierarchical order with their depth (for indented display)."""
+        by_parent: dict[int | None, list[QueryFolder]] = {}
+        for folder in self._folders:
+            by_parent.setdefault(folder.ParentId, []).append(folder)
+        ordered: list[tuple[QueryFolder, int]] = []
+
+        def walk(parent_id: int | None, depth: int) -> None:
+            for folder in sorted(by_parent.get(parent_id, []), key=lambda f: f.Name.lower()):
+                ordered.append((folder, depth))
+                walk(folder.Id, depth + 1)
+
+        walk(None, 0)
+        return ordered
+
     # ── construction ────────────────────────────────────────────────────
     def _build_fields(self, form: QVBoxLayout) -> None:
         self._name = QLineEdit()
@@ -108,6 +128,17 @@ class QueryFormDialog(QDialog):
         for profile in self._profiles:
             self._profile_combo.addItem(profile.Name, profile.Id)
         form.addWidget(labeled_field("Graylog Profili", self._profile_combo, required=True))
+
+        self._folder_combo = QComboBox()
+        self._folder_combo.addItem("(Kök)", None)
+        for folder, depth in self._ordered_folders():
+            self._folder_combo.addItem("    " * depth + folder.Name, folder.Id)
+        default = self._default_folder_id if query is None else None
+        if default is not None:
+            idx = self._folder_combo.findData(default)
+            if idx >= 0:
+                self._folder_combo.setCurrentIndex(idx)
+        form.addWidget(labeled_field("Klasör", self._folder_combo))
 
         self._uses_customer = QCheckBox("Müşteri parametresi kullan")
         form.addWidget(self._uses_customer)
@@ -364,6 +395,9 @@ class QueryFormDialog(QDialog):
         self._query_text.setPlainText(query.QueryTemplate)
         self._fields.set_values(json.loads(query.FieldsJson) if query.FieldsJson else [])
         self._result_size.setValue(query.ResultSize)
+        folder_idx = self._folder_combo.findData(query.FolderId)
+        if folder_idx >= 0:
+            self._folder_combo.setCurrentIndex(folder_idx)
 
         if query.TimeRangeType is TimeRangeType.RELATIVE:
             self._timerange_tabs.setCurrentIndex(0)
@@ -421,5 +455,6 @@ class QueryFormDialog(QDialog):
             FieldsJson=json.dumps(self._fields.values()),
             DefaultSortField=sort_field,
             DefaultSortOrder=sort_order,
+            FolderId=self._folder_combo.currentData(),
             ResultSize=self._result_size.value(),
         )

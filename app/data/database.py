@@ -57,7 +57,22 @@ CREATE TABLE IF NOT EXISTS QueryStream (
     StreamName TEXT    NOT NULL,
     FOREIGN KEY (QueryId) REFERENCES Query (Id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS QueryFolder (
+    Id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    Name     TEXT    NOT NULL,
+    ParentId INTEGER,
+    FOREIGN KEY (ParentId) REFERENCES QueryFolder (Id) ON DELETE CASCADE
+);
 """
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Lightweight migrations for databases created before a column existed."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(Query)")}
+    if "FolderId" not in columns:
+        conn.execute("ALTER TABLE Query ADD COLUMN FolderId INTEGER")
+    conn.commit()
 
 
 def connect(db_path: str | Path | None = None) -> sqlite3.Connection:
@@ -78,6 +93,7 @@ def connect(db_path: str | Path | None = None) -> sqlite3.Connection:
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
-    """Create all tables if they do not already exist."""
+    """Create all tables if they do not already exist, then run migrations."""
     conn.executescript(SCHEMA)
     conn.commit()
+    _migrate(conn)

@@ -37,6 +37,7 @@ def _row_to_model(row: sqlite3.Row) -> Query:
         DefaultSortOrder=(
             SortOrder(row["DefaultSortOrder"]) if row["DefaultSortOrder"] else None
         ),
+        FolderId=row["FolderId"],
         ResultSize=row["ResultSize"],
         CreatedAt=datetime.fromisoformat(row["CreatedAt"]),
         UpdatedAt=datetime.fromisoformat(row["UpdatedAt"]),
@@ -56,8 +57,8 @@ class QueryRepository:
                     (Name, GraylogProfileId, UsesCustomerParameter, QueryTemplate,
                      TimeRangeType, TimeRangeRangeSeconds, TimeRangeFrom, TimeRangeTo,
                      TimeRangeKeyword, FieldsJson, DefaultSortField, DefaultSortOrder,
-                     ResultSize, CreatedAt, UpdatedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     FolderId, ResultSize, CreatedAt, UpdatedAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     query.Name,
@@ -72,6 +73,7 @@ class QueryRepository:
                     query.FieldsJson,
                     query.DefaultSortField,
                     query.DefaultSortOrder.value if query.DefaultSortOrder else None,
+                    query.FolderId,
                     query.ResultSize,
                     timestamp,
                     timestamp,
@@ -116,7 +118,7 @@ class QueryRepository:
                        QueryTemplate = ?, TimeRangeType = ?, TimeRangeRangeSeconds = ?,
                        TimeRangeFrom = ?, TimeRangeTo = ?, TimeRangeKeyword = ?,
                        FieldsJson = ?, DefaultSortField = ?, DefaultSortOrder = ?,
-                       ResultSize = ?, UpdatedAt = ?
+                       FolderId = ?, ResultSize = ?, UpdatedAt = ?
                  WHERE Id = ?
                 """,
                 (
@@ -132,6 +134,7 @@ class QueryRepository:
                     query.FieldsJson,
                     query.DefaultSortField,
                     query.DefaultSortOrder.value if query.DefaultSortOrder else None,
+                    query.FolderId,
                     query.ResultSize,
                     timestamp,
                     query.Id,

@@ -6,22 +6,26 @@ import re
 import sqlite3
 from dataclasses import replace
 
-from PySide6.QtCore import QSize, QSortFilterProxyModel, Qt, QThread, Signal
+from PySide6.QtCore import QSortFilterProxyModel, Qt, QThread, Signal
 from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
-    QListWidget,
-    QListWidgetItem,
+    QMenu,
     QSpinBox,
     QSplitter,
     QStackedWidget,
     QStyledItemDelegate,
     QTableView,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QTreeWidgetItemIterator,
     QVBoxLayout,
     QWidget,
 )
@@ -29,19 +33,27 @@ from PySide6.QtWidgets import (
 from app.core.exceptions import GrayScopeError
 from app.data.models.customer import Customer
 from app.data.models.query import Query
+from app.data.models.query_folder import QueryFolder
 from app.data.repositories.customer_repository import CustomerRepository
 from app.data.repositories.graylog_profile_repository import GraylogProfileRepository
+from app.data.repositories.query_folder_repository import QueryFolderRepository
 from app.data.repositories.query_repository import QueryRepository
 from app.data.repositories.query_stream_repository import QueryStreamRepository
 from app.integrations.graylog.exceptions import GraylogError
 from app.services.query_execution_service import ExecutionResult, execute_query
 from app.services.stream_catalog_service import StreamCatalogService
-from app.ui.components.buttons import icon_button, primary_button
+from app.ui.components.buttons import ghost_button, icon_button, primary_button
 from app.ui.components.dialogs import ConfirmDialog
-from app.ui.components.feedback import EmptyState, badge, show_toast
+from app.ui.components.feedback import EmptyState, show_toast
 from app.ui.components.inputs import SearchInput
 from app.ui.pages.query_form_dialog import QueryFormDialog
+from app.ui.pages.settings_dialog import SettingsDialog
 from app.ui.theme import Colors, Spacing
+from app.ui import theme as _theme
+from app.ui.stylesheets import apply_theme as _apply_theme
+
+# Tree item roles: (kind, id) where kind is "folder" or "query".
+_ROLE = Qt.ItemDataRole.UserRole
 
 # Result stack indices.
 _RESULT_IDLE, _RESULT_LOADING, _RESULT_GRID, _RESULT_EMPTY, _RESULT_ERROR = range(5)
@@ -93,8 +105,6 @@ class _HighlightDelegate(QStyledItemDelegate):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._pattern: "re.Pattern | None" = None
-        self._bg = QColor(Colors.WARNING)
-        self._fg = QColor(Colors.BG_BASE)
 
     def set_pattern(self, pattern) -> None:
         self._pattern = pattern
@@ -102,9 +112,10 @@ class _HighlightDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index) -> None:
         text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
         if self._pattern is not None and self._pattern.search(text):
+            # Read colors live so the highlight follows the active theme.
             painter.save()
-            painter.fillRect(option.rect, self._bg)
-            painter.setPen(self._fg)
+            painter.fillRect(option.rect, QColor(Colors.WARNING))
+            painter.setPen(QColor(Colors.BG_BASE))
             rect = option.rect.adjusted(Spacing.MD, 0, -Spacing.SM, 0)
             painter.drawText(
                 rect,
@@ -119,13 +130,16 @@ class _HighlightDelegate(QStyledItemDelegate):
 class QueriesPage(QWidget):
     def __init__(self, conn: sqlite3.Connection, stream_service: StreamCatalogService) -> None:
         super().__init__()
+        self._conn = conn
         self._queries_repo = QueryRepository(conn)
         self._profiles_repo = GraylogProfileRepository(conn)
         self._streams_repo = QueryStreamRepository(conn)
         self._customers_repo = CustomerRepository(conn)
+        self._folders_repo = QueryFolderRepository(conn)
         self._stream_service = stream_service
 
         self._queries: list[Query] = []
+        self._folders: list[QueryFolder] = []
         self._selected: Query | None = None
         self._worker: _ExecutionWorker | None = None
 
@@ -146,7 +160,7 @@ class QueriesPage(QWidget):
     # ── master (left) ───────────────────────────────────────────────────
     def _build_master(self) -> QWidget:
         panel = QWidget()
-        panel.setMinimumWidth(340)
+        panel.setMinimumWidth(300)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
         layout.setSpacing(Spacing.SM)
@@ -156,14 +170,30 @@ class QueriesPage(QWidget):
         layout.addWidget(self._search)
         layout.addWidget(self._new_button)
 
-        self._list_stack = QStackedWidget()
-        self._list = QListWidget()
-        self._list_empty = EmptyState(
+        self._tree_stack = QStackedWidget()
+        self._tree = QTreeWidget()
+        self._tree.setHeaderHidden(True)
+        self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._tree_empty = EmptyState(
             "\U0001F50E", "Henüz sorgu yok", "Yeni bir sorgu oluşturarak başlayın."
         )
-        self._list_stack.addWidget(self._list)
-        self._list_stack.addWidget(self._list_empty)
-        layout.addWidget(self._list_stack, 1)
+        self._tree_stack.addWidget(self._tree)
+        self._tree_stack.addWidget(self._tree_empty)
+        layout.addWidget(self._tree_stack, 1)
+
+        # Bottom corner: settings + theme toggle.
+        bottom = QHBoxLayout()
+        bottom.setContentsMargins(0, 0, 0, 0)
+        self._settings_button = ghost_button("⚙  Ayarlar")
+        is_dark = _theme.current_theme() == "dark"
+        self._theme_button = icon_button(
+            "☀" if is_dark else "🌙",
+            "Açık temaya geç" if is_dark else "Koyu temaya geç",
+        )
+        bottom.addWidget(self._settings_button)
+        bottom.addStretch()
+        bottom.addWidget(self._theme_button)
+        layout.addLayout(bottom)
         return panel
 
     # ── detail (right) ──────────────────────────────────────────────────
@@ -200,7 +230,7 @@ class QueriesPage(QWidget):
         # from the result grid below. A thin separator divides the (optional)
         # parameter area from the query/run row.
         self._run_panel = QFrame()
-        self._run_panel.setProperty("class", "card")
+        self._run_panel.setProperty("class", "run-panel")
         panel_layout = QVBoxLayout(self._run_panel)
         panel_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
         panel_layout.setSpacing(Spacing.MD)
@@ -236,6 +266,7 @@ class QueriesPage(QWidget):
         run_layout.setSpacing(Spacing.SM)
 
         self._query_input = QLineEdit()
+        self._query_input.setProperty("class", "plain-input")
         self._query_input.setPlaceholderText("Sorgu metni")
         self._query_input.setToolTip("Çalıştırmadan önce sorgu metnini geçici olarak düzenleyebilirsiniz")
 
@@ -298,9 +329,12 @@ class QueriesPage(QWidget):
 
     # ── data / behaviour ────────────────────────────────────────────────
     def _connect_signals(self) -> None:
-        self._search.textChanged.connect(self._render_list)
+        self._search.textChanged.connect(self._render_tree)
         self._new_button.clicked.connect(self._on_new)
-        self._list.currentItemChanged.connect(self._on_select)
+        self._tree.currentItemChanged.connect(self._on_select)
+        self._tree.customContextMenuRequested.connect(self._on_tree_menu)
+        self._settings_button.clicked.connect(self._open_settings)
+        self._theme_button.clicked.connect(self._toggle_theme)
         self._edit_button.clicked.connect(self._on_edit)
         self._delete_button.clicked.connect(self._on_delete)
         self._customer_combo.currentIndexChanged.connect(self._update_run_enabled)
@@ -308,58 +342,135 @@ class QueriesPage(QWidget):
 
     def load_data(self) -> None:
         self._queries = self._queries_repo.get_all()
+        self._folders = self._folders_repo.get_all()
         self._profiles_by_id = {p.Id: p for p in self._profiles_repo.get_all()}
-        self._render_list()
+        self._render_tree()
 
-    def _render_list(self) -> None:
+    # ── tree ─────────────────────────────────────────────────────────────
+    def _render_tree(self) -> None:
         term = self._search.text().strip().lower()
-        visible = [q for q in self._queries if term in q.Name.lower()] if term else self._queries
-        self._list_stack.setCurrentIndex(1 if not self._queries else 0)
+        self._tree_stack.setCurrentIndex(
+            1 if (not self._queries and not self._folders) else 0
+        )
 
-        self._list.blockSignals(True)
-        self._list.clear()
-        for query in visible:
-            item = QListWidgetItem()
-            item.setData(Qt.ItemDataRole.UserRole, query.Id)
-            self._list.addItem(item)
-            row = self._list_row(query)
-            self._list.setItemWidget(item, row)
-            # Allow up to ~2 wrapped lines; longer names clip and reveal via tooltip.
-            hint = row.sizeHint()
-            item.setSizeHint(QSize(hint.width(), min(hint.height(), 72)))
-        self._list.blockSignals(False)
+        self._tree.blockSignals(True)
+        self._tree.clear()
+        root = self._tree.invisibleRootItem()
 
-    def _list_row(self, query: Query) -> QWidget:
-        row = QWidget()
-        row.setProperty("class", "list-row")
-        layout = QVBoxLayout(row)
-        layout.setContentsMargins(Spacing.SM, Spacing.SM, Spacing.SM, Spacing.SM)
-        layout.setSpacing(Spacing.XS)
-        name = QLabel(query.Name)
-        name.setProperty("class", "query-name")
-        name.setWordWrap(True)
-        name.setToolTip(query.Name)
-        profile = self._profiles_by_id.get(query.GraylogProfileId)
-        profile_badge = badge(profile.Name if profile else "—", "muted")
-        badge_row = QHBoxLayout()
-        badge_row.setContentsMargins(0, 0, 0, 0)
-        badge_row.addWidget(profile_badge)
-        badge_row.addStretch()
-        layout.addWidget(name)
-        layout.addLayout(badge_row)
-        return row
+        by_parent: dict[int | None, list[QueryFolder]] = {}
+        for folder in self._folders:
+            by_parent.setdefault(folder.ParentId, []).append(folder)
 
-    def _on_select(self, current: QListWidgetItem | None, _previous=None) -> None:
-        if current is None:
-            self._selected = None
-            self._detail_stack.setCurrentIndex(0)
-            return
-        query_id = current.data(Qt.ItemDataRole.UserRole)
-        self._selected = next((q for q in self._queries if q.Id == query_id), None)
-        if self._selected is None:
-            self._detail_stack.setCurrentIndex(0)
-            return
-        self._show_detail(self._selected)
+        folder_items: dict[int, QTreeWidgetItem] = {}
+
+        def add_folders(parent_id: int | None, parent_item: QTreeWidgetItem) -> None:
+            for folder in sorted(by_parent.get(parent_id, []), key=lambda f: f.Name.lower()):
+                item = QTreeWidgetItem(parent_item, [f"\U0001F4C1  {folder.Name}"])
+                item.setData(0, _ROLE, ("folder", folder.Id))
+                folder_items[folder.Id] = item
+                add_folders(folder.Id, item)
+
+        add_folders(None, root)
+
+        for query in self._queries:
+            if term and term not in query.Name.lower():
+                continue
+            parent_item = folder_items.get(query.FolderId, root)
+            item = QTreeWidgetItem(parent_item, [query.Name])
+            item.setData(0, _ROLE, ("query", query.Id))
+            item.setToolTip(0, query.Name)
+
+        if term:
+            self._prune_empty_folders(folder_items, root)
+        self._tree.expandAll()
+        self._tree.blockSignals(False)
+
+    def _prune_empty_folders(self, folder_items, root) -> None:
+        changed = True
+        while changed:
+            changed = False
+            for fid, item in list(folder_items.items()):
+                if item.childCount() == 0:
+                    (item.parent() or root).removeChild(item)
+                    del folder_items[fid]
+                    changed = True
+
+    def _selected_kind_id(self):
+        item = self._tree.currentItem()
+        return item.data(0, _ROLE) if item else (None, None)
+
+    def _on_select(self, current: QTreeWidgetItem | None, _previous=None) -> None:
+        kind, ident = current.data(0, _ROLE) if current else (None, None)
+        if kind == "query":
+            self._selected = next((q for q in self._queries if q.Id == ident), None)
+            if self._selected:
+                self._show_detail(self._selected)
+                return
+        self._selected = None
+        self._detail_stack.setCurrentIndex(0)
+
+    # ── folders (context menu) ───────────────────────────────────────────
+    def _folder_name(self, folder_id: int) -> str:
+        return next((f.Name for f in self._folders if f.Id == folder_id), "")
+
+    def _on_tree_menu(self, pos) -> None:
+        item = self._tree.itemAt(pos)
+        menu = QMenu(self)
+        if item is None:
+            menu.addAction("Yeni Klasör", lambda: self._new_folder(None))
+        else:
+            kind, ident = item.data(0, _ROLE)
+            if kind == "folder":
+                menu.addAction("Yeni Alt Klasör", lambda: self._new_folder(ident))
+                menu.addAction("Yeniden Adlandır", lambda: self._rename_folder(ident))
+                menu.addSeparator()
+                menu.addAction("Sil", lambda: self._delete_folder(ident))
+            else:
+                menu.addAction("Düzenle", self._on_edit)
+                menu.addAction("Sil", self._on_delete)
+        menu.exec(self._tree.viewport().mapToGlobal(pos))
+
+    def _new_folder(self, parent_id: int | None) -> None:
+        name, ok = QInputDialog.getText(self, "Yeni Klasör", "Klasör adı:")
+        if ok and name.strip():
+            self._folders_repo.create(QueryFolder(Name=name.strip(), ParentId=parent_id))
+            self.load_data()
+
+    def _rename_folder(self, folder_id: int) -> None:
+        name, ok = QInputDialog.getText(
+            self, "Yeniden Adlandır", "Klasör adı:", text=self._folder_name(folder_id)
+        )
+        if ok and name.strip():
+            self._folders_repo.rename(folder_id, name.strip())
+            self.load_data()
+
+    def _delete_folder(self, folder_id: int) -> None:
+        if ConfirmDialog.confirm(
+            self,
+            "Klasörü sil",
+            f"'{self._folder_name(folder_id)}' klasörünü silmek istediğinize emin misiniz? "
+            "İçindeki sorgular kök seviyeye taşınır.",
+            confirm_text="Sil",
+            danger=True,
+        ):
+            self._folders_repo.delete(folder_id)
+            self.load_data()
+
+    # ── settings & theme ─────────────────────────────────────────────────
+    def _open_settings(self) -> None:
+        SettingsDialog(self._conn, self).exec()
+        self.load_data()  # profiles/customers may have changed
+
+    def _toggle_theme(self) -> None:
+        from PySide6.QtCore import QSettings
+
+        new_mode = "light" if _theme.current_theme() == "dark" else "dark"
+        _apply_theme(QApplication.instance(), new_mode)
+        QSettings("GrayScope", "GrayScope").setValue("theme", new_mode)
+        is_dark = new_mode == "dark"
+        self._theme_button.setText("☀" if is_dark else "🌙")
+        self._theme_button.setToolTip("Açık temaya geç" if is_dark else "Koyu temaya geç")
+        self._table.viewport().update()
 
     def _show_detail(self, query: Query) -> None:
         self._detail_stack.setCurrentIndex(1)
@@ -406,20 +517,34 @@ class QueriesPage(QWidget):
         if not profiles:
             show_toast(self, "Önce bir Graylog profili ekleyin.", "warning")
             return
-        dialog = QueryFormDialog(self, profiles, self._stream_service)
+        kind, ident = self._selected_kind_id()
+        if kind == "folder":
+            default_folder = ident
+        elif kind == "query" and self._selected:
+            default_folder = self._selected.FolderId
+        else:
+            default_folder = None
+        dialog = QueryFormDialog(
+            self, profiles, self._stream_service,
+            folders=self._folders, default_folder_id=default_folder,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         created = self._queries_repo.create(dialog.result_query())
         self._streams_repo.replace_for_query(created.Id, dialog.selected_streams())
         show_toast(self, "Sorgu kaydedildi.", "success")
         self.load_data()
+        self._reselect(created.Id)
 
     def _on_edit(self) -> None:
         if self._selected is None:
             return
         profiles = self._active_profiles()
         existing = self._streams_repo.get_by_query(self._selected.Id)
-        dialog = QueryFormDialog(self, profiles, self._stream_service, self._selected, existing)
+        dialog = QueryFormDialog(
+            self, profiles, self._stream_service, self._selected, existing,
+            folders=self._folders,
+        )
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         updated = self._queries_repo.update(dialog.result_query())
@@ -446,10 +571,13 @@ class QueriesPage(QWidget):
         self.load_data()
 
     def _reselect(self, query_id: int) -> None:
-        for i in range(self._list.count()):
-            if self._list.item(i).data(Qt.ItemDataRole.UserRole) == query_id:
-                self._list.setCurrentRow(i)
+        iterator = QTreeWidgetItemIterator(self._tree)
+        while iterator.value():
+            item = iterator.value()
+            if item.data(0, _ROLE) == ("query", query_id):
+                self._tree.setCurrentItem(item)
                 return
+            iterator += 1
 
     # ── execution ─────────────────────────────────────────────────────────
     def _on_run(self) -> None:
