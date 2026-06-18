@@ -162,6 +162,24 @@ QListView::item:selected, QListWidget::item:selected {{
 /* Custom item-widget rows are transparent so the list surface shows through. */
 QWidget[class="list-row"] {{ background: transparent; }}
 
+/* ── Tree (saved queries) — no dark fill, blends with its panel ─────────── */
+QTreeView, QTreeWidget {{
+    background: transparent; border: none; outline: none; color: {C.TEXT_PRIMARY};
+}}
+QTreeView::item, QTreeWidget::item {{
+    padding: {S.XS}px {S.XS}px; border-radius: {R.SM}px; color: {C.TEXT_PRIMARY};
+}}
+QTreeView::item:hover, QTreeWidget::item:hover {{ background-color: {C.BG_ELEVATED}; }}
+QTreeView::item:selected, QTreeWidget::item:selected {{
+    background-color: {C.ACCENT_MUTED}; color: {C.TEXT_PRIMARY};
+}}
+
+/* ── Run panel (parameters strip) — no fill, just a separator ──────────── */
+QFrame[class="run-panel"] {{ background: transparent; border: none; }}
+
+/* Query text field on the run row — no dark fill, outline only. */
+QLineEdit[class="plain-input"] {{ background: transparent; }}
+
 /* ── Frames / cards / sidebar ──────────────────────────────────────────── */
 QFrame[class="card"] {{
     background-color: {C.BG_SURFACE}; border: 1px solid {C.BORDER}; border-radius: {R.LG}px;
@@ -262,10 +280,16 @@ QToolTip {{
 """
 
 
-def apply_theme(app) -> None:
-    """Apply the global stylesheet and default font. Call once after QApplication()."""
+def apply_theme(app, mode: str | None = None) -> None:
+    """Switch palette (if ``mode`` given) and apply the global stylesheet + font.
+
+    Safe to call again at runtime to toggle themes — Qt re-polishes all widgets.
+    """
+    from app.ui import theme
     from app.ui.theme import Typography as Typo
 
+    if mode is not None:
+        theme.set_theme(mode)
     app.setStyleSheet(get_global_stylesheet())
     font = make_font_default(Typo)
     app.setFont(font)

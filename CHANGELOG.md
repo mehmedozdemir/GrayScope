@@ -8,6 +8,14 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
 ## [Unreleased]
 
 ### Added
+- Kapsamlı UI overhaul: sol sidebar kaldırıldı; sorgular en solda **ağaç yapısında**
+  (iç içe klasörler + klasör altında sorgular) listelenir. Klasör işlemleri sağ-tık
+  menüsü (Yeni Klasör / Alt Klasör / Yeniden Adlandır / Sil), sorgu formunda **Klasör**
+  seçici. Veri modeli: `QueryFolder` tablosu + `Query.FolderId` (otomatik migrasyon).
+- **Ayarlar ve Tanımlamalar** modalı (sol-alt ⚙) — Graylog Profilleri ve Müşteriler
+  sekmeli olarak buradan yönetilir.
+- **Açık tema** eklendi; sol-alt ikonla anlık tema değişimi, tercih kalıcı (QSettings).
+- Parametre şeridi, sorgu ağacı ve sorgu metni alanından koyu dolgu kaldırıldı.
 - Proje iskeleti: klasör yapısı, `requirements.txt`, `.gitignore`, `.env.example`,
   `README.md` taslağı, `CHANGELOG.md`.
 - SQLite şema ve repository katmanı: `GraylogProfile`, `Customer`, `Query`, `QueryStream`.
