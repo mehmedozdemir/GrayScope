@@ -22,3 +22,13 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
 - Graylog REST istemcisi (`integrations/graylog/`) + `connection_test_service`.
 - Graylog Profilleri ekranı: CRUD + asenkron "Bağlantıyı Test Et" (token maskeli/şifreli).
 - `GraylogClient` HTTP hata eşleme testleri (httpx MockTransport).
+- Sorgular ekranı: master-detail (QSplitter) sorgu listesi + detay, parametrik sorgularda
+  arama destekli müşteri seçici, "Çalıştır" (müşteri seçilmeden disabled), sonuç grid'i
+  (client-side `QSortFilterProxyModel` sıralama), loading/empty/error durumları.
+- Yeni/Düzenle Sorgu dialog'u: profil, müşteri parametresi, monospace sorgu metni,
+  profile göre async stream seçimi (yenile + hata durumu), 3 sekmeli tarih aralığı,
+  chip tabanlı alan girişi, varsayılan sıralama, sonuç limiti.
+- `query_execution_service` ({Plaka} enjeksiyonu + tarih aralığı) ve
+  `stream_catalog_service` (profil bazlı cache); `GraylogClient.execute_search`
+  (POST /search/messages, CSV parse).
+- `ChipInput` bileşeni; sorgu çalıştırma ve CSV parse için offline testler.

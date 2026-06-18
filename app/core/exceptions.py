@@ -24,3 +24,7 @@ class ProfileInUseError(GrayScopeError):
 
 class EncryptionError(GrayScopeError):
     """Token encryption or decryption failed."""
+
+
+class QueryValidationError(GrayScopeError):
+    """A query cannot be executed as configured (e.g. missing customer selection)."""

@@ -173,6 +173,14 @@ QLabel[class="badge"][tone="accent"] {{ background-color: {C.ACCENT_MUTED}; colo
 QLabel[class="badge"][tone="success"] {{ background-color: {C.SUCCESS_MUTED}; color: {C.SUCCESS}; }}
 QLabel[class="badge"][tone="muted"] {{ background-color: {C.BG_ELEVATED}; color: {C.TEXT_DISABLED}; }}
 
+/* ── Chip (tag input) ──────────────────────────────────────────────────── */
+QFrame[class="chip"] {{
+    background-color: {C.ACCENT_MUTED}; border-radius: {R.FULL}px;
+}}
+QFrame[class="chip"] QLabel {{ color: {C.ACCENT}; font-size: {T.SIZE_SM}px; background: transparent; }}
+QFrame[class="chip"] QPushButton {{ color: {C.ACCENT}; font-size: {T.SIZE_XS}px; }}
+QFrame[class="chip"] QPushButton:hover {{ color: {C.TEXT_PRIMARY}; }}
+
 /* ── Toast ─────────────────────────────────────────────────────────────── */
 QFrame[class="toast"] {{
     background-color: {C.BG_OVERLAY}; border: 1px solid {C.BORDER_STRONG};
