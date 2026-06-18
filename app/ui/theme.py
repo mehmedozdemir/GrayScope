@@ -133,5 +133,5 @@ def make_font(size: int, weight: int = Typography.WEIGHT_REGULAR,
 
     font = QFont(family)
     font.setPixelSize(size)
-    font.setWeight(weight)
+    font.setWeight(QFont.Weight(weight))
     return font

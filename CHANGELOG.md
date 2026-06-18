@@ -8,6 +8,8 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
 ## [Unreleased]
 
 ### Added
+- Grid hücresine çift tıklayınca değeri ayrı pencerede gösterme; JSON/XML/YAML
+  formatlama, Markdown render, otomatik algılama ve kopyalama butonu (PyYAML eklendi).
 - Kapsamlı UI overhaul: sol sidebar kaldırıldı; sorgular en solda **ağaç yapısında**
   (iç içe klasörler + klasör altında sorgular) listelenir. Klasör işlemleri sağ-tık
   menüsü (Yeni Klasör / Alt Klasör / Yeniden Adlandır / Sil), sorgu formunda **Klasör**
