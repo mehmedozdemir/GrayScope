@@ -38,4 +38,6 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
   Müşteri seçici kendi satırına alındı.
 - Tüm UI fontu **JetBrains Mono** (sistemde yoksa varsayılan fonta düşer).
 - Sorgular ekranı: sonuç grid'inin altında sabit **full-text arama** kutusu — yazdıkça
-  eşleşen hücreler vurgu rengiyle (amber) işaretlenir (filtrelemez, vurgular).
+  içeriğinde aranan değeri geçen hücreler vurgu rengiyle (amber) işaretlenir
+  (filtrelemez, vurgular). `*` ve `?` joker karakterleri desteklenir. Vurgu, QSS'i
+  baypas etmek için özel bir delegate ile çizilir.

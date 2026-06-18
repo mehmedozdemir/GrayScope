@@ -2,11 +2,12 @@
 (DESIGN_SYSTEM.md §3, PROJECT_PLAN.md §5.4)."""
 from __future__ import annotations
 
+import re
 import sqlite3
 from dataclasses import replace
 
 from PySide6.QtCore import QSize, QSortFilterProxyModel, Qt, QThread, Signal
-from PySide6.QtGui import QBrush, QColor, QStandardItem, QStandardItemModel
+from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -18,6 +19,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QSplitter,
     QStackedWidget,
+    QStyledItemDelegate,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -62,6 +64,55 @@ class _ExecutionWorker(QThread):
             self.failed.emit("Sorgu çalıştırılırken beklenmeyen bir hata oluştu.")
             return
         self.succeeded.emit(result)
+
+
+def compile_search(term: str) -> "re.Pattern | None":
+    """Compile a result-search term into a case-insensitive 'contains' matcher.
+
+    Plain text matches as a substring; ``*`` and ``?`` act as wildcards
+    (``*`` = any run of chars, ``?`` = one char). Returns None for empty input.
+    """
+    term = term.strip()
+    if not term:
+        return None
+    pattern = re.escape(term).replace(r"\*", ".*").replace(r"\?", ".")
+    try:
+        return re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        return None
+
+
+class _HighlightDelegate(QStyledItemDelegate):
+    """Paints cells matching the search term with a highlight background.
+
+    Done in a delegate (not via the model's BackgroundRole) because the table's
+    stylesheet overrides item BackgroundRole, so model-set colors never render.
+    """
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._pattern: "re.Pattern | None" = None
+        self._bg = QColor(Colors.WARNING)
+        self._fg = QColor(Colors.BG_BASE)
+
+    def set_pattern(self, pattern) -> None:
+        self._pattern = pattern
+
+    def paint(self, painter, option, index) -> None:
+        text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
+        if self._pattern is not None and self._pattern.search(text):
+            painter.save()
+            painter.fillRect(option.rect, self._bg)
+            painter.setPen(self._fg)
+            rect = option.rect.adjusted(Spacing.MD, 0, -Spacing.SM, 0)
+            painter.drawText(
+                rect,
+                int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+                text,
+            )
+            painter.restore()
+        else:
+            super().paint(painter, option, index)
 
 
 class QueriesPage(QWidget):
@@ -213,6 +264,8 @@ class QueriesPage(QWidget):
         self._table.verticalHeader().setVisible(False)
         self._proxy = QSortFilterProxyModel(self)
         self._table.setModel(self._proxy)
+        self._highlight_delegate = _HighlightDelegate(self._table)
+        self._table.setItemDelegate(self._highlight_delegate)
         self._results.insertWidget(_RESULT_GRID, self._table)
 
         self._results.insertWidget(
@@ -444,28 +497,13 @@ class QueriesPage(QWidget):
         self._grid_search.blockSignals(True)
         self._grid_search.clear()
         self._grid_search.blockSignals(False)
+        self._highlight_delegate.set_pattern(None)
         self._grid_search.setVisible(visible)
 
     def _highlight_matches(self) -> None:
-        """Highlight result cells whose text contains the search term (live, as typed)."""
-        model = self._proxy.sourceModel()
-        if not isinstance(model, QStandardItemModel):
-            return
-        term = self._grid_search.text().strip().lower()
-        match_bg = QBrush(QColor(Colors.WARNING))
-        match_fg = QBrush(QColor(Colors.BG_BASE))
-        default = QBrush()
-        for r in range(model.rowCount()):
-            for c in range(model.columnCount()):
-                item = model.item(r, c)
-                if item is None:
-                    continue
-                if term and term in item.text().lower():
-                    item.setBackground(match_bg)
-                    item.setForeground(match_fg)
-                else:
-                    item.setBackground(default)
-                    item.setForeground(default)
+        """Update the highlight pattern as the user types (substring + wildcards)."""
+        self._highlight_delegate.set_pattern(compile_search(self._grid_search.text()))
+        self._table.viewport().update()
 
     def _on_run_finished(self) -> None:
         self._worker = None
