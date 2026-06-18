@@ -182,8 +182,11 @@ QFrame[class="master-panel"] {{
 /* ── Run panel (parameters strip) — no fill, just a separator ──────────── */
 QFrame[class="run-panel"] {{ background: transparent; border: none; }}
 
-/* Query text field on the run row — no dark fill, outline only. */
-QLineEdit[class="plain-input"] {{ background: transparent; }}
+/* Query text field on the run row — no dark fill; monospace for query text. */
+QLineEdit[class="plain-input"] {{
+    background: transparent;
+    font-family: 'JetBrains Mono', '{T.FONT_MONO}', monospace;
+}}
 
 /* ── Frames / cards / sidebar ──────────────────────────────────────────── */
 QFrame[class="card"] {{
