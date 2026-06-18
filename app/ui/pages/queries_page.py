@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
 
 from PySide6.QtCore import QSize, QSortFilterProxyModel, Qt, QThread, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
@@ -11,8 +12,10 @@ from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QSpinBox,
     QSplitter,
     QStackedWidget,
     QTableView,
@@ -141,21 +144,44 @@ class QueriesPage(QWidget):
         header.addWidget(self._delete_button)
         layout.addLayout(header)
 
-        self._run_row = QWidget()
-        run_layout = QHBoxLayout(self._run_row)
-        run_layout.setContentsMargins(0, 0, 0, 0)
-        run_layout.setSpacing(Spacing.SM)
+        # Customer selector — own row, shown only for parametric queries.
+        self._customer_row = QWidget()
+        customer_layout = QHBoxLayout(self._customer_row)
+        customer_layout.setContentsMargins(0, 0, 0, 0)
+        customer_layout.setSpacing(Spacing.SM)
         self._customer_label = QLabel("Müşteri:")
         self._customer_label.setProperty("class", "field-label")
         self._customer_combo = QComboBox()
         self._customer_combo.setMinimumWidth(240)
         # Non-editable: clicking opens the full city list; typing jumps to a match.
-        # (An editable combo only opens via the arrow / filters on type, which read
-        # as an empty, unclickable box.)
+        customer_layout.addWidget(self._customer_label)
+        customer_layout.addWidget(self._customer_combo)
+        customer_layout.addStretch()
+        layout.addWidget(self._customer_row)
+
+        # Run row: editable query text (widest) + record count + run button.
+        self._run_row = QWidget()
+        run_layout = QHBoxLayout(self._run_row)
+        run_layout.setContentsMargins(0, 0, 0, 0)
+        run_layout.setSpacing(Spacing.SM)
+
+        self._query_input = QLineEdit()
+        self._query_input.setPlaceholderText("Sorgu metni")
+        self._query_input.setToolTip("Çalıştırmadan önce sorgu metnini geçici olarak düzenleyebilirsiniz")
+
+        count_label = QLabel("Adet:")
+        count_label.setProperty("class", "field-label")
+        self._count_spin = QSpinBox()
+        self._count_spin.setRange(0, 1_000_000)
+        self._count_spin.setSpecialValueText("Tümü")  # 0 → all records
+        self._count_spin.setToolTip("Çekilecek kayıt sayısı (0 = tüm kayıtlar)")
+        self._count_spin.setFixedWidth(96)
+
         self._run_button = primary_button("Çalıştır")
-        run_layout.addWidget(self._customer_label)
-        run_layout.addWidget(self._customer_combo)
-        run_layout.addStretch()
+
+        run_layout.addWidget(self._query_input, 1)
+        run_layout.addWidget(count_label)
+        run_layout.addWidget(self._count_spin)
         run_layout.addWidget(self._run_button)
         layout.addWidget(self._run_row)
 
@@ -255,11 +281,13 @@ class QueriesPage(QWidget):
     def _show_detail(self, query: Query) -> None:
         self._detail_stack.setCurrentIndex(1)
         self._title.setText(query.Name)
-        self._run_row.setVisible(True)
+
+        # Pre-fill the editable run controls from the saved query (single-line view).
+        self._query_input.setText(query.QueryTemplate.replace("\n", " "))
+        self._count_spin.setValue(query.ResultSize)
 
         parametric = query.UsesCustomerParameter
-        self._customer_label.setVisible(parametric)
-        self._customer_combo.setVisible(parametric)
+        self._customer_row.setVisible(parametric)
         if parametric:
             self._populate_customers()
         self._results.setCurrentIndex(_RESULT_IDLE)
@@ -349,10 +377,18 @@ class QueriesPage(QWidget):
         stream_ids = [qs.StreamId for qs in self._streams_repo.get_by_query(self._selected.Id)]
         customer: Customer | None = self._customer_combo.currentData()
 
+        # Ad-hoc overrides from the run row (not persisted): edited query text and
+        # record count (0 = all). Empty text falls back to "*" (match all).
+        effective = replace(
+            self._selected,
+            QueryTemplate=self._query_input.text().strip() or "*",
+            ResultSize=self._count_spin.value(),
+        )
+
         self._results.setCurrentIndex(_RESULT_LOADING)
         self._run_button.setEnabled(False)
 
-        worker = _ExecutionWorker(profile, self._selected, stream_ids, customer, self)
+        worker = _ExecutionWorker(profile, effective, stream_ids, customer, self)
         self._worker = worker
         worker.succeeded.connect(self._on_run_succeeded)
         worker.failed.connect(self._on_run_failed)

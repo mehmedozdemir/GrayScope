@@ -59,3 +59,23 @@ def test_execute_search_parses_csv_and_strips_field_prefix():
 
     assert len(rows) == 2
     assert rows[0] == {"timestamp": "2026-01-01", "StatusCode": "500"}
+
+
+def test_execute_search_omits_size_when_zero():
+    import json
+
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.content)
+        return httpx.Response(200, text='"field: a"\n1\n')
+
+    _client(handler).execute_search(
+        query_string="*",
+        streams=["s"],
+        timerange={"type": "relative", "range": 60},
+        fields=["a"],
+        size=0,
+    )
+
+    assert "size" not in captured["body"]  # 0 → fetch all (no limit sent)

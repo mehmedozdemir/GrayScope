@@ -32,3 +32,7 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
   `stream_catalog_service` (profil bazlı cache); `GraylogClient.execute_search`
   (POST /search/messages, CSV parse).
 - `ChipInput` bileşeni; sorgu çalıştırma ve CSV parse için offline testler.
+- Sorgular ekranı çalıştırma satırı: grid üstünde düzenlenebilir **sorgu metni** alanı
+  (seçili sorgunun değeriyle dolar, kaydetmeden geçici düzenleyip yeniden çalıştırılabilir)
+  ve **kayıt sayısı** alanı (seçili sorgunun değeriyle dolar; **0 = tüm kayıtlar**).
+  Müşteri seçici kendi satırına alındı.
