@@ -212,8 +212,8 @@ class QueriesPage(QWidget):
     def _build_detail_content(self) -> QWidget:
         content = QWidget()
         layout = QVBoxLayout(content)
-        layout.setContentsMargins(Spacing.XL, Spacing.XL, Spacing.XL, Spacing.XL)
-        layout.setSpacing(Spacing.LG)
+        layout.setContentsMargins(Spacing.LG, Spacing.MD, Spacing.LG, Spacing.MD)
+        layout.setSpacing(Spacing.SM)
 
         header = QHBoxLayout()
         self._title = QLabel()
@@ -232,8 +232,8 @@ class QueriesPage(QWidget):
         self._run_panel = QFrame()
         self._run_panel.setProperty("class", "run-panel")
         panel_layout = QVBoxLayout(self._run_panel)
-        panel_layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        panel_layout.setSpacing(Spacing.MD)
+        panel_layout.setContentsMargins(0, 0, 0, 0)
+        panel_layout.setSpacing(Spacing.SM)
 
         # Parameters area — shown only for parametric queries.
         self._customer_row = QWidget()

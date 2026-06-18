@@ -92,8 +92,8 @@ class QueryFormDialog(QDialog):
         outer.addWidget(scroll, 1)
 
         form = QVBoxLayout(content)
-        form.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
-        form.setSpacing(Spacing.MD)
+        form.setContentsMargins(Spacing.LG, Spacing.MD, Spacing.LG, Spacing.MD)
+        form.setSpacing(Spacing.SM)
 
         self._build_fields(form)
         outer.addWidget(self._build_footer())
@@ -133,7 +133,7 @@ class QueryFormDialog(QDialog):
         self._folder_combo.addItem("(Kök)", None)
         for folder, depth in self._ordered_folders():
             self._folder_combo.addItem("    " * depth + folder.Name, folder.Id)
-        default = self._default_folder_id if query is None else None
+        default = self._default_folder_id if self._query is None else None
         if default is not None:
             idx = self._folder_combo.findData(default)
             if idx >= 0:
