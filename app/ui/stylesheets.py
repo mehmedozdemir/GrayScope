@@ -39,6 +39,9 @@ QLabel[class="field-label"] {{
     font-size: {T.SIZE_SM}px; font-weight: {T.WEIGHT_MEDIUM}; color: {C.TEXT_SECONDARY};
 }}
 QLabel[class="caption"] {{ font-size: {T.SIZE_SM}px; color: {C.TEXT_SECONDARY}; }}
+QLabel[class="query-name"] {{
+    font-size: {T.SIZE_MD}px; font-weight: {T.WEIGHT_MEDIUM}; color: {C.TEXT_PRIMARY};
+}}
 QLabel[class="hint"] {{ font-size: {T.SIZE_SM}px; color: {C.TEXT_SECONDARY}; }}
 QLabel[class="empty-state-title"] {{
     font-size: {T.SIZE_LG}px; font-weight: {T.WEIGHT_SEMIBOLD}; color: {C.TEXT_SECONDARY};
