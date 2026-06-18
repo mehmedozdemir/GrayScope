@@ -34,6 +34,7 @@ class Query:
     TimeRangeKeyword: str | None = None
     DefaultSortField: str | None = None
     DefaultSortOrder: SortOrder | None = None
+    FolderId: int | None = None  # None = root level (no folder)
     Id: int | None = None
     CreatedAt: datetime | None = None
     UpdatedAt: datetime | None = None
