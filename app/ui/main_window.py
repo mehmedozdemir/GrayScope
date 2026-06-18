@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from PySide6.QtCore import QThread
 from PySide6.QtWidgets import QHBoxLayout, QStackedWidget, QWidget
 
 from app.services.stream_catalog_service import StreamCatalogService
@@ -46,3 +47,11 @@ class MainWindow(QWidget):
 
         self._sidebar.navigation_changed.connect(self._stack.setCurrentIndex)
         self._sidebar.set_active(0)
+
+    def closeEvent(self, event) -> None:
+        # Wait for any in-flight worker threads (query run, connection test) so they
+        # are not destroyed mid-run, which would abort the process.
+        for thread in self.findChildren(QThread):
+            if thread.isRunning():
+                thread.wait(12000)
+        super().closeEvent(event)
