@@ -6,7 +6,7 @@ import sqlite3
 from dataclasses import replace
 
 from PySide6.QtCore import QSize, QSortFilterProxyModel, Qt, QThread, Signal
-from PySide6.QtGui import QStandardItem, QStandardItemModel
+from PySide6.QtGui import QBrush, QColor, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -38,7 +38,7 @@ from app.ui.components.dialogs import ConfirmDialog
 from app.ui.components.feedback import EmptyState, badge, show_toast
 from app.ui.components.inputs import SearchInput
 from app.ui.pages.query_form_dialog import QueryFormDialog
-from app.ui.theme import Spacing
+from app.ui.theme import Colors, Spacing
 
 # Result stack indices.
 _RESULT_IDLE, _RESULT_LOADING, _RESULT_GRID, _RESULT_EMPTY, _RESULT_ERROR = range(5)
@@ -186,6 +186,14 @@ class QueriesPage(QWidget):
         layout.addWidget(self._run_row)
 
         layout.addWidget(self._build_results(), 1)
+
+        # Full-text search over the result grid, fixed at the bottom (grid-wide).
+        self._grid_search = QLineEdit()
+        self._grid_search.setPlaceholderText("\U0001F50D  Sonuçlarda ara (eşleşenler vurgulanır)…")
+        self._grid_search.setClearButtonEnabled(True)
+        self._grid_search.setVisible(False)
+        self._grid_search.textChanged.connect(self._highlight_matches)
+        layout.addWidget(self._grid_search)
         return content
 
     def _build_results(self) -> QWidget:
@@ -291,6 +299,7 @@ class QueriesPage(QWidget):
         if parametric:
             self._populate_customers()
         self._results.setCurrentIndex(_RESULT_IDLE)
+        self._set_grid_search_visible(False)
         self._update_run_enabled()
 
     def _populate_customers(self) -> None:
@@ -398,6 +407,7 @@ class QueriesPage(QWidget):
 
     def _on_run_succeeded(self, result: ExecutionResult) -> None:
         if not result.rows:
+            self._set_grid_search_visible(False)
             self._results.setCurrentIndex(_RESULT_EMPTY)
             return
         model = QStandardItemModel(len(result.rows), len(result.fields), self)
@@ -420,13 +430,42 @@ class QueriesPage(QWidget):
             )
             self._table.sortByColumn(result.fields.index(sort_field), order)
         self._results.setCurrentIndex(_RESULT_GRID)
+        self._set_grid_search_visible(True)
 
     def _on_run_failed(self, message: str) -> None:
+        self._set_grid_search_visible(False)
         # Rebuild the error empty-state with the actual message.
         self._results.removeWidget(self._error_state)
         self._error_state = EmptyState("⚠", "Sorgu çalıştırılamadı", message)
         self._results.insertWidget(_RESULT_ERROR, self._error_state)
         self._results.setCurrentIndex(_RESULT_ERROR)
+
+    def _set_grid_search_visible(self, visible: bool) -> None:
+        self._grid_search.blockSignals(True)
+        self._grid_search.clear()
+        self._grid_search.blockSignals(False)
+        self._grid_search.setVisible(visible)
+
+    def _highlight_matches(self) -> None:
+        """Highlight result cells whose text contains the search term (live, as typed)."""
+        model = self._proxy.sourceModel()
+        if not isinstance(model, QStandardItemModel):
+            return
+        term = self._grid_search.text().strip().lower()
+        match_bg = QBrush(QColor(Colors.WARNING))
+        match_fg = QBrush(QColor(Colors.BG_BASE))
+        default = QBrush()
+        for r in range(model.rowCount()):
+            for c in range(model.columnCount()):
+                item = model.item(r, c)
+                if item is None:
+                    continue
+                if term and term in item.text().lower():
+                    item.setBackground(match_bg)
+                    item.setForeground(match_fg)
+                else:
+                    item.setBackground(default)
+                    item.setForeground(default)
 
     def _on_run_finished(self) -> None:
         self._worker = None
