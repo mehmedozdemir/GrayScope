@@ -100,12 +100,12 @@ class Typography:
     FONT_MONO = "Consolas"  # Query text / monospace contexts (DESIGN_SYSTEM.md §4).
 
     SIZE_XS = 10
-    SIZE_SM = 12
-    SIZE_MD = 14
-    SIZE_LG = 16
-    SIZE_XL = 20
-    SIZE_2XL = 28
-    SIZE_3XL = 36
+    SIZE_SM = 11
+    SIZE_MD = 13
+    SIZE_LG = 14
+    SIZE_XL = 17
+    SIZE_2XL = 22
+    SIZE_3XL = 30
 
     WEIGHT_REGULAR = 400
     WEIGHT_MEDIUM = 500

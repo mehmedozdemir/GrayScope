@@ -57,8 +57,8 @@ QLabel[class="error-text"] {{ font-size: {T.SIZE_SM}px; color: {C.ERROR}; }}
 /* ── Buttons ───────────────────────────────────────────────────────────── */
 QPushButton {{
     font-size: {T.SIZE_SM}px; font-weight: {T.WEIGHT_MEDIUM};
-    border: none; border-radius: {R.MD}px;
-    padding: {S.XS}px {S.MD}px; min-height: 28px;
+    border: none; border-radius: {R.SM}px;
+    padding: 3px 10px; min-height: 24px;
 }}
 QPushButton[variant="primary"] {{ background-color: {C.ACCENT}; color: white; }}
 QPushButton[variant="primary"]:hover {{ background-color: {C.ACCENT_HOVER}; }}
@@ -87,8 +87,8 @@ QPushButton[variant="danger"]:hover {{ background-color: #E86878; }}
 QPushButton[variant="danger"]:pressed {{ background-color: #C04458; }}
 
 QPushButton[variant="icon"] {{
-    background-color: transparent; border-radius: {R.MD}px; padding: {S.XS}px;
-    min-width: 30px; max-width: 30px; min-height: 30px; max-height: 30px;
+    background-color: transparent; border-radius: {R.SM}px; padding: 3px;
+    min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px;
     color: {C.TEXT_SECONDARY}; font-size: {T.SIZE_MD}px;
 }}
 QPushButton[variant="icon"]:hover {{ background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY}; }}
@@ -98,8 +98,8 @@ QPushButton[variant="icon"]:disabled {{ color: {C.TEXT_DISABLED}; }}
 /* ── Inputs ────────────────────────────────────────────────────────────── */
 QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QDateTimeEdit, QDateEdit, QTimeEdit {{
     background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY};
-    border: 1px solid {C.BORDER}; border-radius: {R.MD}px;
-    padding: {S.XS}px {S.SM}px; min-height: 28px;
+    border: 1px solid {C.BORDER}; border-radius: {R.SM}px;
+    padding: 3px {S.SM}px; min-height: 24px;
     selection-background-color: {C.ACCENT_MUTED};
 }}
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus,
@@ -116,19 +116,19 @@ QPlainTextEdit[mono="true"] {{ font-family: '{T.FONT_MONO}', monospace; }}
 /* ── ComboBox ──────────────────────────────────────────────────────────── */
 QComboBox {{
     background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY};
-    border: 1px solid {C.BORDER}; border-radius: {R.MD}px;
-    padding: {S.XS}px {S.SM}px; min-height: 28px;
+    border: 1px solid {C.BORDER}; border-radius: {R.SM}px;
+    padding: 3px {S.SM}px; min-height: 24px;
 }}
 QComboBox:focus {{ border-color: {C.BORDER_FOCUS}; }}
 QComboBox:hover {{ border-color: {C.BORDER_STRONG}; }}
-QComboBox::drop-down {{ border: none; width: 28px; }}
+QComboBox::drop-down {{ border: none; width: 24px; }}
 QComboBox QAbstractItemView {{
     background-color: {C.BG_OVERLAY}; color: {C.TEXT_PRIMARY};
-    border: 1px solid {C.BORDER}; border-radius: {R.MD}px; padding: {S.XS}px;
+    border: 1px solid {C.BORDER}; border-radius: {R.SM}px; padding: 3px;
     selection-background-color: {C.ACCENT_MUTED}; selection-color: {C.TEXT_PRIMARY};
     outline: none;
 }}
-QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 0 {S.SM}px; }}
+QComboBox QAbstractItemView::item {{ min-height: 24px; padding: 0 {S.SM}px; }}
 
 /* ── Tables ────────────────────────────────────────────────────────────── */
 QTableView {{
@@ -138,14 +138,14 @@ QTableView {{
     selection-background-color: {C.ACCENT_MUTED}; selection-color: {C.TEXT_PRIMARY};
     outline: none;
 }}
-QTableView::item {{ padding: {S.SM}px {S.MD}px; border: none; }}
+QTableView::item {{ padding: 4px {S.SM}px; border: none; }}
 QTableView::item:hover {{ background-color: {C.BG_ELEVATED}; }}
 QTableView::item:selected {{ background-color: {C.ACCENT_MUTED}; color: {C.TEXT_PRIMARY}; }}
 QHeaderView {{ background-color: transparent; }}
 QHeaderView::section {{
     background-color: {C.BG_SURFACE}; color: {C.TEXT_SECONDARY};
     font-size: {T.SIZE_SM}px; font-weight: {T.WEIGHT_SEMIBOLD}; letter-spacing: 0.5px;
-    padding: {S.SM}px {S.MD}px; border: none; border-bottom: 1px solid {C.BORDER};
+    padding: 4px {S.SM}px; border: none; border-bottom: 1px solid {C.BORDER};
 }}
 QHeaderView::section:hover {{ background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY}; }}
 QTableCornerButton::section {{ background-color: {C.BG_SURFACE}; border: none; }}
@@ -205,9 +205,9 @@ QFrame[class="separator"] {{ background-color: {C.BORDER}; max-height: 1px; bord
 /* ── Sidebar nav items ─────────────────────────────────────────────────── */
 QPushButton[class="nav-item"] {{
     background-color: transparent; color: {C.TEXT_SECONDARY}; text-align: left;
-    padding: 0 {S.MD}px; border-radius: {R.MD}px;
+    padding: 0 {S.MD}px; border-radius: {R.SM}px;
     font-size: {T.SIZE_MD}px; font-weight: {T.WEIGHT_MEDIUM};
-    min-height: 38px; border-left: 3px solid transparent;
+    min-height: 32px; border-left: 3px solid transparent;
 }}
 QPushButton[class="nav-item"]:hover {{ background-color: {C.BG_ELEVATED}; color: {C.TEXT_PRIMARY}; }}
 QPushButton[class="nav-item"][active="true"] {{
@@ -246,12 +246,12 @@ QFrame[class="toast"][tone="info"] {{ border-left: 4px solid {C.INFO}; }}
 /* ── CheckBox & RadioButton ────────────────────────────────────────────── */
 QCheckBox, QRadioButton {{ color: {C.TEXT_PRIMARY}; spacing: {S.SM}px; }}
 QCheckBox::indicator, QRadioButton::indicator {{
-    width: 18px; height: 18px; border: 1.5px solid {C.BORDER_STRONG};
+    width: 15px; height: 15px; border: 1.5px solid {C.BORDER_STRONG};
     border-radius: {R.SM}px; background-color: {C.BG_ELEVATED};
 }}
 QCheckBox::indicator:checked {{ background-color: {C.ACCENT}; border-color: {C.ACCENT}; }}
 QCheckBox::indicator:hover, QRadioButton::indicator:hover {{ border-color: {C.ACCENT}; }}
-QRadioButton::indicator {{ border-radius: 9px; }}
+QRadioButton::indicator {{ border-radius: 8px; }}
 QRadioButton::indicator:checked {{ background-color: {C.ACCENT}; border-color: {C.ACCENT}; }}
 
 /* ── Tabs ──────────────────────────────────────────────────────────────── */
@@ -261,7 +261,7 @@ QTabWidget::pane {{
 }}
 QTabBar::tab {{
     background-color: transparent; color: {C.TEXT_SECONDARY};
-    padding: {S.SM}px {S.LG}px; border: none; border-bottom: 2px solid transparent;
+    padding: 5px {S.MD}px; border: none; border-bottom: 2px solid transparent;
 }}
 QTabBar::tab:hover {{ color: {C.TEXT_PRIMARY}; }}
 QTabBar::tab:selected {{
