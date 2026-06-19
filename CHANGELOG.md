@@ -8,6 +8,15 @@ Format [Keep a Changelog](https://keepachangelog.com/tr/1.1.0/) temel alınır v
 ## [Unreleased]
 
 ### Added
+- **Sorgu yedekleme / geri yükleme:** Sol panele "⬆ Yedekle" ve "⬇ Yükle" butonları
+  eklendi. Tüm sorgular, klasör hiyerarşisi ve stream atamaları JSON dosyasına aktarılır;
+  geri yüklemede aynı isimli sorgular atlanır, eksik profil için uyarı gösterilir.
+- **CSV ve Excel export:** Sorgu çalıştırma sonuçları grid'in altındaki "CSV" ve "Excel"
+  butonlarıyla dışa aktarılabilir. Excel çıktısında başlık satırı biçimlendirilir ve
+  sütunlar otomatik genişletilir. Export sadece sonuç mevcutken görünür.
+- **Çalıştırma geçmişi:** Her başarılı çalıştırmanın tarihi ve sonuç sayısı veritabanına
+  kaydedilir; sorgu detay panelinin üst kısmında "Son çalıştırma: GG.AA.YYYY SS:DD  •  N kayıt"
+  olarak gösterilir.
 - Windows 11 kurulum paketi: `scripts/generate_icon.py` (Pillow ile ICO),
   `grayscope.spec` (PyInstaller), `installer/grayscope.iss` (Inno Setup 6),
   `scripts/build.bat` (tek komutla ikon → EXE → kurulum paketi). Pencere ikonu

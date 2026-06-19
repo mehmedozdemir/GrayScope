@@ -37,3 +37,5 @@ class Query:
     Id: int | None = None
     CreatedAt: datetime | None = None
     UpdatedAt: datetime | None = None
+    LastRunAt: datetime | None = None
+    LastRunCount: int | None = None

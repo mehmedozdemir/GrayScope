@@ -43,7 +43,7 @@ from app.services.query_execution_service import (
     extract_parameters,
 )
 from app.services.stream_catalog_service import StreamCatalogService
-from app.ui.components.buttons import ghost_button, icon_button, primary_button
+from app.ui.components.buttons import ghost_button, icon_button, primary_button, secondary_button
 from app.ui.components.cell_value_dialog import CellValueDialog
 from app.ui.components.relative_range_widget import RelativeRangeWidget
 from app.ui.components.dialogs import ConfirmDialog
@@ -193,6 +193,18 @@ class QueriesPage(QWidget):
             "☀" if is_dark else "🌙",
             "Açık temaya geç" if is_dark else "Koyu temaya geç",
         )
+        backup_row = QHBoxLayout()
+        backup_row.setContentsMargins(0, 0, 0, 0)
+        backup_row.setSpacing(Spacing.SM)
+        self._backup_btn = ghost_button("⬆ Yedekle")
+        self._backup_btn.setToolTip("Sorguları JSON dosyasına aktar")
+        self._restore_btn = ghost_button("⬇ Yükle")
+        self._restore_btn.setToolTip("JSON dosyasından sorguları geri yükle")
+        backup_row.addWidget(self._backup_btn)
+        backup_row.addWidget(self._restore_btn)
+        backup_row.addStretch()
+        layout.addLayout(backup_row)
+
         bottom.addWidget(self._settings_button)
         bottom.addStretch()
         bottom.addWidget(self._theme_button)
@@ -230,6 +242,11 @@ class QueriesPage(QWidget):
         header.addWidget(self._copy_button)
         header.addWidget(self._delete_button)
         layout.addLayout(header)
+
+        self._run_history_label = QLabel()
+        self._run_history_label.setProperty("class", "caption")
+        self._run_history_label.setVisible(False)
+        layout.addWidget(self._run_history_label)
 
         # Info/control row: stream badges (left) + relative range widget (right).
         self._info_row = QWidget()
@@ -304,13 +321,31 @@ class QueriesPage(QWidget):
 
         layout.addWidget(self._build_results(), 1)
 
-        # Full-text search over the result grid, fixed at the bottom (grid-wide).
+        # Bottom bar: full-text search (left) + export buttons (right).
+        bottom_bar = QWidget()
+        bottom_bar.setVisible(False)
+        self._bottom_bar = bottom_bar
+        bar_layout = QHBoxLayout(bottom_bar)
+        bar_layout.setContentsMargins(0, 0, 0, 0)
+        bar_layout.setSpacing(Spacing.SM)
+
         self._grid_search = QLineEdit()
         self._grid_search.setPlaceholderText("\U0001F50D  Sonuçlarda ara (eşleşenler vurgulanır)…")
         self._grid_search.setClearButtonEnabled(True)
-        self._grid_search.setVisible(False)
         self._grid_search.textChanged.connect(self._highlight_matches)
-        layout.addWidget(self._grid_search)
+
+        self._export_csv_btn = secondary_button("CSV")
+        self._export_csv_btn.setToolTip("Sonuçları CSV olarak dışa aktar")
+        self._export_xlsx_btn = secondary_button("Excel")
+        self._export_xlsx_btn.setToolTip("Sonuçları Excel (.xlsx) olarak dışa aktar")
+        self._export_csv_btn.clicked.connect(self._on_export_csv)
+        self._export_xlsx_btn.clicked.connect(self._on_export_xlsx)
+
+        bar_layout.addWidget(self._grid_search, 1)
+        bar_layout.addWidget(self._export_csv_btn)
+        bar_layout.addWidget(self._export_xlsx_btn)
+
+        layout.addWidget(bottom_bar)
         return content
 
     def _build_results(self) -> QWidget:
@@ -349,6 +384,8 @@ class QueriesPage(QWidget):
         self._tree.customContextMenuRequested.connect(self._on_tree_menu)
         self._settings_button.clicked.connect(self._open_settings)
         self._theme_button.clicked.connect(self._toggle_theme)
+        self._backup_btn.clicked.connect(self._on_backup)
+        self._restore_btn.clicked.connect(self._on_restore)
         self._edit_button.clicked.connect(self._on_edit)
         self._copy_button.clicked.connect(self._on_copy)
         self._delete_button.clicked.connect(self._on_delete)
@@ -487,6 +524,45 @@ class QueriesPage(QWidget):
             self.load_data()
 
     # ── settings & theme ─────────────────────────────────────────────────
+    # ── backup / restore ────────────────────────────────────────────────────
+    def _on_backup(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        from app.services.backup_service import export_backup
+        from datetime import datetime
+        default_name = f"grayscope_yedek_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Sorguları Yedekle", default_name, "JSON Dosyası (*.json)"
+        )
+        if not path:
+            return
+        data = export_backup(self._conn)
+        import json
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        show_toast(self, f"{len(data['queries'])} sorgu JSON olarak kaydedildi.", "success")
+
+    def _on_restore(self) -> None:
+        from PySide6.QtWidgets import QFileDialog
+        from app.services.backup_service import import_backup
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Yedeği Yükle", "", "JSON Dosyası (*.json)"
+        )
+        if not path:
+            return
+        import json
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            added, skipped, warnings = import_backup(self._conn, data)
+        except Exception as exc:
+            show_toast(self, f"Yedek yüklenemedi: {exc}", "error")
+            return
+        self.load_data()
+        msg = f"{added} sorgu eklendi, {skipped} atlandı."
+        if warnings:
+            msg += "  (" + "; ".join(warnings[:2]) + ("…" if len(warnings) > 2 else "") + ")"
+        show_toast(self, msg, "success" if added else "warning")
+
     def _open_settings(self) -> None:
         SettingsDialog(self._conn, self).exec()
         self.load_data()  # profiles/customers may have changed
@@ -514,6 +590,7 @@ class QueriesPage(QWidget):
         self._detail_stack.setCurrentIndex(1)
         self._title.setText(query.Name)
         self._populate_stream_badges(query)
+        self._refresh_run_history_label(query)
 
         # Pre-fill the editable run controls from the saved query (single-line view).
         # Block signals so the param fields are rebuilt once, with their defaults.
@@ -706,31 +783,52 @@ class QueriesPage(QWidget):
         worker.start()
 
     def _on_run_succeeded(self, result: ExecutionResult) -> None:
+        row_count = len(result.rows)
+
         if not result.rows:
             self._set_grid_search_visible(False)
             self._results.setCurrentIndex(_RESULT_EMPTY)
+        else:
+            model = QStandardItemModel(row_count, len(result.fields), self)
+            model.setHorizontalHeaderLabels(result.fields)
+            for r, row in enumerate(result.rows):
+                for c, field in enumerate(result.fields):
+                    item = QStandardItem(str(row.get(field, "")))
+                    item.setEditable(False)
+                    model.setItem(r, c, item)
+            self._proxy.setSourceModel(model)  # replaces previous result (FR-Query-Run-02)
+
+            sort_field = self._selected.DefaultSortField if self._selected else None
+            if sort_field and sort_field in result.fields:
+                from app.data.models.query import SortOrder
+                order = (
+                    Qt.SortOrder.DescendingOrder
+                    if self._selected.DefaultSortOrder is SortOrder.DESC
+                    else Qt.SortOrder.AscendingOrder
+                )
+                self._table.sortByColumn(result.fields.index(sort_field), order)
+            self._results.setCurrentIndex(_RESULT_GRID)
+            self._set_grid_search_visible(True)
+
+        # Persist run stats and refresh the label.
+        if self._selected and self._selected.Id:
+            self._queries_repo.update_run_stats(self._selected.Id, row_count)
+            self._selected.LastRunCount = row_count
+            from datetime import datetime, timezone
+            self._selected.LastRunAt = datetime.now(timezone.utc)
+            self._refresh_run_history_label(self._selected)
+
+    def _refresh_run_history_label(self, query: Query) -> None:
+        if query.LastRunAt is None:
+            self._run_history_label.setVisible(False)
             return
-        model = QStandardItemModel(len(result.rows), len(result.fields), self)
-        model.setHorizontalHeaderLabels(result.fields)
-        for r, row in enumerate(result.rows):
-            for c, field in enumerate(result.fields):
-                item = QStandardItem(str(row.get(field, "")))
-                item.setEditable(False)
-                model.setItem(r, c, item)
-        self._proxy.setSourceModel(model)  # replaces previous result (FR-Query-Run-02)
-
-        sort_field = self._selected.DefaultSortField if self._selected else None
-        if sort_field and sort_field in result.fields:
-            from app.data.models.query import SortOrder
-
-            order = (
-                Qt.SortOrder.DescendingOrder
-                if self._selected.DefaultSortOrder is SortOrder.DESC
-                else Qt.SortOrder.AscendingOrder
-            )
-            self._table.sortByColumn(result.fields.index(sort_field), order)
-        self._results.setCurrentIndex(_RESULT_GRID)
-        self._set_grid_search_visible(True)
+        from datetime import timezone
+        local_dt = query.LastRunAt.astimezone().strftime("%d.%m.%Y %H:%M")
+        count = query.LastRunCount if query.LastRunCount is not None else 0
+        self._run_history_label.setText(
+            f"Son çalıştırma: {local_dt}  •  {count} kayıt"
+        )
+        self._run_history_label.setVisible(True)
 
     def _on_run_failed(self, message: str) -> None:
         self._set_grid_search_visible(False)
@@ -745,12 +843,78 @@ class QueriesPage(QWidget):
         self._grid_search.clear()
         self._grid_search.blockSignals(False)
         self._highlight_delegate.set_pattern(None)
-        self._grid_search.setVisible(visible)
+        self._bottom_bar.setVisible(visible)
 
     def _highlight_matches(self) -> None:
         """Update the highlight pattern as the user types (substring + wildcards)."""
         self._highlight_delegate.set_pattern(compile_search(self._grid_search.text()))
         self._table.viewport().update()
+
+    # ── export ──────────────────────────────────────────────────────────────
+    def _grid_data(self) -> tuple[list[str], list[list[str]]]:
+        """Return (headers, rows) from the current proxy model in display order."""
+        src = self._proxy.sourceModel()
+        if src is None:
+            return [], []
+        col_count = src.columnCount()
+        headers = [src.horizontalHeaderItem(c).text() for c in range(col_count)]
+        rows = []
+        for pr in range(self._proxy.rowCount()):
+            rows.append([
+                self._proxy.index(pr, c).data() or "" for c in range(col_count)
+            ])
+        return headers, rows
+
+    def _export_filename(self, ext: str) -> str | None:
+        from PySide6.QtWidgets import QFileDialog
+        name = (self._selected.Name if self._selected else "sorgu_sonuclari")
+        name = name.replace(" ", "_")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Dışa Aktar", f"{name}.{ext}",
+            f"{'CSV Dosyası' if ext=='csv' else 'Excel Dosyası'} (*.{ext})"
+        )
+        return path or None
+
+    def _on_export_csv(self) -> None:
+        path = self._export_filename("csv")
+        if not path:
+            return
+        import csv
+        headers, rows = self._grid_data()
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.writer(f)
+            w.writerow(headers)
+            w.writerows(rows)
+        show_toast(self, f"{len(rows)} kayıt CSV olarak kaydedildi.", "success")
+
+    def _on_export_xlsx(self) -> None:
+        path = self._export_filename("xlsx")
+        if not path:
+            return
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment
+        except ImportError:
+            show_toast(self, "openpyxl kurulu değil: pip install openpyxl", "error")
+            return
+        headers, rows = self._grid_data()
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = (self._selected.Name[:31] if self._selected else "Sonuçlar")
+        header_font = Font(bold=True, color="F0F2FF")
+        header_fill = PatternFill("solid", fgColor="1A1D27")
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=c, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+            ws.column_dimensions[cell.column_letter].width = max(12, len(h) + 4)
+        for r, row in enumerate(rows, 2):
+            for c, val in enumerate(row, 1):
+                ws.cell(row=r, column=c, value=val)
+        ws.freeze_panes = "A2"
+        wb.save(path)
+        show_toast(self, f"{len(rows)} kayıt Excel olarak kaydedildi.", "success")
 
     def _on_run_finished(self) -> None:
         self._worker = None

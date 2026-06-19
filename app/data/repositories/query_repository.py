@@ -40,6 +40,8 @@ def _row_to_model(row: sqlite3.Row) -> Query:
         ResultSize=row["ResultSize"],
         CreatedAt=datetime.fromisoformat(row["CreatedAt"]),
         UpdatedAt=datetime.fromisoformat(row["UpdatedAt"]),
+        LastRunAt=_dt_or_none(row["LastRunAt"]),
+        LastRunCount=row["LastRunCount"],
     )
 
 
@@ -144,6 +146,14 @@ class QueryRepository:
         self._conn.commit()
         query.UpdatedAt = datetime.fromisoformat(timestamp)
         return query
+
+    def update_run_stats(self, query_id: int, count: int) -> None:
+        """Record a successful run (timestamp + result count)."""
+        self._conn.execute(
+            "UPDATE Query SET LastRunAt = ?, LastRunCount = ? WHERE Id = ?",
+            (_now(), count, query_id),
+        )
+        self._conn.commit()
 
     def delete(self, query_id: int) -> None:
         """Delete a query. Bound QueryStream rows are removed via ON DELETE CASCADE."""

@@ -65,6 +65,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE Query ADD COLUMN FolderId INTEGER")
     if "UsesCustomerParameter" in columns:
         conn.execute("ALTER TABLE Query DROP COLUMN UsesCustomerParameter")
+    if "LastRunAt" not in columns:
+        conn.execute("ALTER TABLE Query ADD COLUMN LastRunAt TEXT")
+    if "LastRunCount" not in columns:
+        conn.execute("ALTER TABLE Query ADD COLUMN LastRunCount INTEGER")
     # Legacy {Plaka} placeholder → {NetworkId}.
     conn.execute(
         "UPDATE Query SET QueryTemplate = REPLACE(QueryTemplate, '{Plaka}', '{NetworkId}')"
