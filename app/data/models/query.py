@@ -23,7 +23,6 @@ class SortOrder(str, Enum):
 class Query:
     Name: str
     GraylogProfileId: int
-    UsesCustomerParameter: bool
     QueryTemplate: str
     TimeRangeType: TimeRangeType
     FieldsJson: str

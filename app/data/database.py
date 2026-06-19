@@ -22,19 +22,10 @@ CREATE TABLE IF NOT EXISTS GraylogProfile (
     UpdatedAt       TEXT    NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS Customer (
-    Id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    NetworkId   INTEGER NOT NULL UNIQUE,
-    Name        TEXT    NOT NULL,
-    IsActive    INTEGER NOT NULL DEFAULT 1,
-    Description TEXT
-);
-
 CREATE TABLE IF NOT EXISTS Query (
     Id                    INTEGER PRIMARY KEY AUTOINCREMENT,
     Name                  TEXT    NOT NULL UNIQUE,
     GraylogProfileId      INTEGER NOT NULL,
-    UsesCustomerParameter INTEGER NOT NULL,
     QueryTemplate         TEXT    NOT NULL,
     TimeRangeType         TEXT    NOT NULL,
     TimeRangeRangeSeconds INTEGER,
@@ -68,14 +59,18 @@ CREATE TABLE IF NOT EXISTS QueryFolder (
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    """Lightweight migrations for databases created before a column existed."""
+    """Lightweight migrations for databases created before a schema change."""
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(Query)")}
     if "FolderId" not in columns:
         conn.execute("ALTER TABLE Query ADD COLUMN FolderId INTEGER")
-    # The legacy {Plaka} placeholder is now the named parameter {NetworkId}.
+    if "UsesCustomerParameter" in columns:
+        conn.execute("ALTER TABLE Query DROP COLUMN UsesCustomerParameter")
+    # Legacy {Plaka} placeholder → {NetworkId}.
     conn.execute(
         "UPDATE Query SET QueryTemplate = REPLACE(QueryTemplate, '{Plaka}', '{NetworkId}')"
     )
+    # Drop Customer table if it still exists from an older schema.
+    conn.execute("DROP TABLE IF EXISTS Customer")
     conn.commit()
 
 

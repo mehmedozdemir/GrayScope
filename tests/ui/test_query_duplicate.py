@@ -40,7 +40,6 @@ def test_copy_query_duplicates_with_streams(qapp):
         Query(
             Name="Orijinal",
             GraylogProfileId=profile.Id,
-            UsesCustomerParameter=False,
             QueryTemplate="*",
             TimeRangeType=TimeRangeType.RELATIVE,
             TimeRangeRangeSeconds=60,

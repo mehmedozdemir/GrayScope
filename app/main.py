@@ -1,22 +1,15 @@
-"""GrayScope application entry point.
-
-Bootstraps the database (schema + city seed), then launches the PySide6 UI.
-"""
+"""GrayScope application entry point."""
 from __future__ import annotations
 
 import sqlite3
 import sys
 
 from app.data.database import connect, init_schema
-from app.data.repositories.customer_repository import CustomerRepository
-from app.data.seed.turkish_cities import seed_customers
 
 
 def bootstrap() -> sqlite3.Connection:
-    """Create the schema and seed reference data, returning the shared connection."""
     conn = connect()
     init_schema(conn)
-    seed_customers(CustomerRepository(conn))
     return conn
 
 

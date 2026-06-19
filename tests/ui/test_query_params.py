@@ -31,7 +31,6 @@ def _make_query(repo, profile_id, name, template):
         Query(
             Name=name,
             GraylogProfileId=profile_id,
-            UsesCustomerParameter=True,
             QueryTemplate=template,
             TimeRangeType=TimeRangeType.RELATIVE,
             TimeRangeRangeSeconds=60,

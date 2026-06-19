@@ -32,7 +32,6 @@ def test_delete_folder_moves_queries_to_root(conn):
         Query(
             Name="Q",
             GraylogProfileId=profile.Id,
-            UsesCustomerParameter=False,
             QueryTemplate="*",
             TimeRangeType=TimeRangeType.RELATIVE,
             TimeRangeRangeSeconds=60,

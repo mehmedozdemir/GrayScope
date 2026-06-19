@@ -21,7 +21,6 @@ def test_migration_renames_plaka_placeholder():
         Query(
             Name="Legacy",
             GraylogProfileId=profile.Id,
-            UsesCustomerParameter=True,
             QueryTemplate="NetworkId:{Plaka} AND NOT StatusCode:200",
             TimeRangeType=TimeRangeType.RELATIVE,
             TimeRangeRangeSeconds=60,

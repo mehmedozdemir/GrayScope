@@ -25,7 +25,6 @@ def _row_to_model(row: sqlite3.Row) -> Query:
         Id=row["Id"],
         Name=row["Name"],
         GraylogProfileId=row["GraylogProfileId"],
-        UsesCustomerParameter=bool(row["UsesCustomerParameter"]),
         QueryTemplate=row["QueryTemplate"],
         TimeRangeType=TimeRangeType(row["TimeRangeType"]),
         TimeRangeRangeSeconds=row["TimeRangeRangeSeconds"],
@@ -54,16 +53,15 @@ class QueryRepository:
             cursor = self._conn.execute(
                 """
                 INSERT INTO Query
-                    (Name, GraylogProfileId, UsesCustomerParameter, QueryTemplate,
+                    (Name, GraylogProfileId, QueryTemplate,
                      TimeRangeType, TimeRangeRangeSeconds, TimeRangeFrom, TimeRangeTo,
                      TimeRangeKeyword, FieldsJson, DefaultSortField, DefaultSortOrder,
                      FolderId, ResultSize, CreatedAt, UpdatedAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     query.Name,
                     query.GraylogProfileId,
-                    int(query.UsesCustomerParameter),
                     query.QueryTemplate,
                     query.TimeRangeType.value,
                     query.TimeRangeRangeSeconds,
@@ -114,7 +112,7 @@ class QueryRepository:
             self._conn.execute(
                 """
                 UPDATE Query
-                   SET Name = ?, GraylogProfileId = ?, UsesCustomerParameter = ?,
+                   SET Name = ?, GraylogProfileId = ?,
                        QueryTemplate = ?, TimeRangeType = ?, TimeRangeRangeSeconds = ?,
                        TimeRangeFrom = ?, TimeRangeTo = ?, TimeRangeKeyword = ?,
                        FieldsJson = ?, DefaultSortField = ?, DefaultSortOrder = ?,
@@ -124,7 +122,6 @@ class QueryRepository:
                 (
                     query.Name,
                     query.GraylogProfileId,
-                    int(query.UsesCustomerParameter),
                     query.QueryTemplate,
                     query.TimeRangeType.value,
                     query.TimeRangeRangeSeconds,

@@ -57,7 +57,6 @@ def test_edit_query_form_opens_with_folder(qapp):
         Id=9,
         Name="Q",
         GraylogProfileId=1,
-        UsesCustomerParameter=False,
         QueryTemplate="*",
         TimeRangeType=TimeRangeType.RELATIVE,
         TimeRangeRangeSeconds=60,

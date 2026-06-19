@@ -16,7 +16,6 @@ def _query(**overrides) -> Query:
     base = dict(
         Name="q",
         GraylogProfileId=1,
-        UsesCustomerParameter=True,
         QueryTemplate="NetworkId:{NetworkId} AND NOT StatusCode:200",
         TimeRangeType=TimeRangeType.RELATIVE,
         FieldsJson='["timestamp"]',

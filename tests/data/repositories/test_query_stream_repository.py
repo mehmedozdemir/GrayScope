@@ -21,7 +21,6 @@ def _make_query(conn) -> int:
         Query(
             Name="Test Sorgusu",
             GraylogProfileId=profile.Id,
-            UsesCustomerParameter=False,
             QueryTemplate="StatusCode:500",
             TimeRangeType=TimeRangeType.KEYWORD,
             TimeRangeKeyword="yesterday",
