@@ -26,6 +26,10 @@ build/
 dist/
 .installed.cfg
 
+# --- PyInstaller / Inno Setup build artefacts ---
+*.spec.bak
+installer/output/
+
 # Virtual environments
 .venv/
 venv/
