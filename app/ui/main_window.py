@@ -7,12 +7,16 @@ from the bottom-left of that page.
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 from PySide6.QtCore import QThread
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.pages.queries_page import QueriesPage
+
+_ICON = Path(__file__).parent.parent.parent / "assets" / "grayscope.ico"
 
 
 class MainWindow(QWidget):
@@ -21,6 +25,8 @@ class MainWindow(QWidget):
         self._conn = conn
         self.setWindowTitle("GrayScope")
         self.setMinimumSize(1280, 720)
+        if _ICON.exists():
+            self.setWindowIcon(QIcon(str(_ICON)))
 
         self._stream_service = StreamCatalogService()
 
