@@ -26,7 +26,6 @@ def test_create_and_get_query(conn):
         Query(
             Name="Şehir bazlı 200 dışı yanıtlar",
             GraylogProfileId=profile_id,
-            UsesCustomerParameter=True,
             QueryTemplate="NetworkId:{Plaka} AND NOT StatusCode:200",
             TimeRangeType=TimeRangeType.RELATIVE,
             TimeRangeRangeSeconds=3600,
@@ -39,6 +38,5 @@ def test_create_and_get_query(conn):
     fetched = repo.get_by_id(created.Id)
     assert fetched is not None
     assert fetched.TimeRangeType is TimeRangeType.RELATIVE
-    assert fetched.UsesCustomerParameter is True
     assert fetched.ResultSize == 150
     assert "{Plaka}" in fetched.QueryTemplate

@@ -29,7 +29,6 @@ from app.data.models.query import Query, SortOrder, TimeRangeType
 from app.data.models.query_folder import QueryFolder
 from app.data.models.query_stream import QueryStream
 from app.integrations.graylog.exceptions import GraylogError
-from app.services.query_execution_service import extract_parameters
 from app.services.stream_catalog_service import StreamCatalogService
 from app.ui.components.buttons import icon_button, primary_button, secondary_button
 from app.ui.components.inputs import ChipInput, SearchInput, labeled_field
@@ -423,7 +422,6 @@ class QueryFormDialog(QDialog):
             Id=self._query.Id if self._query else None,
             Name=self._name.text().strip(),
             GraylogProfileId=self._profile_combo.currentData(),
-            UsesCustomerParameter=bool(extract_parameters(template)),
             QueryTemplate=template,
             TimeRangeType=time_type,
             TimeRangeRangeSeconds=self._relative_range.seconds() if tab == 0 else None,
