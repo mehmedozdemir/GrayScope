@@ -184,26 +184,24 @@ class QueriesPage(QWidget):
         self._tree_stack.addWidget(self._tree_empty)
         layout.addWidget(self._tree_stack, 1)
 
-        # Bottom corner: settings + theme toggle.
+        # Bottom corner: settings dropdown + theme toggle.
         bottom = QHBoxLayout()
         bottom.setContentsMargins(0, 0, 0, 0)
-        self._settings_button = ghost_button("⚙  Ayarlar")
+        self._settings_button = icon_button("⚙", "Ayarlar")
         is_dark = _theme.current_theme() == "dark"
         self._theme_button = icon_button(
             "☀" if is_dark else "🌙",
             "Açık temaya geç" if is_dark else "Koyu temaya geç",
         )
-        backup_row = QHBoxLayout()
-        backup_row.setContentsMargins(0, 0, 0, 0)
-        backup_row.setSpacing(Spacing.SM)
-        self._backup_btn = ghost_button("⬆ Yedekle")
-        self._backup_btn.setToolTip("Sorguları JSON dosyasına aktar")
-        self._restore_btn = ghost_button("⬇ Yükle")
-        self._restore_btn.setToolTip("JSON dosyasından sorguları geri yükle")
-        backup_row.addWidget(self._backup_btn)
-        backup_row.addWidget(self._restore_btn)
-        backup_row.addStretch()
-        layout.addLayout(backup_row)
+
+        from PySide6.QtWidgets import QMenu
+        settings_menu = QMenu(self)
+        self._action_settings = settings_menu.addAction("⚙  Ayarlar")
+        settings_menu.addSeparator()
+        self._action_backup = settings_menu.addAction("⬆  Sorguları Yedekle")
+        self._action_restore = settings_menu.addAction("⬇  Yedeği Yükle")
+        self._settings_button.setMenu(settings_menu)
+        self._settings_button.clicked.connect(self._settings_button.showMenu)
 
         bottom.addWidget(self._settings_button)
         bottom.addStretch()
@@ -382,10 +380,10 @@ class QueriesPage(QWidget):
         self._new_button.clicked.connect(self._on_new)
         self._tree.currentItemChanged.connect(self._on_select)
         self._tree.customContextMenuRequested.connect(self._on_tree_menu)
-        self._settings_button.clicked.connect(self._open_settings)
+        self._action_settings.triggered.connect(self._open_settings)
         self._theme_button.clicked.connect(self._toggle_theme)
-        self._backup_btn.clicked.connect(self._on_backup)
-        self._restore_btn.clicked.connect(self._on_restore)
+        self._action_backup.triggered.connect(self._on_backup)
+        self._action_restore.triggered.connect(self._on_restore)
         self._edit_button.clicked.connect(self._on_edit)
         self._copy_button.clicked.connect(self._on_copy)
         self._delete_button.clicked.connect(self._on_delete)
