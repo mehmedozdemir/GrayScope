@@ -98,36 +98,60 @@ def compile_search(term: str) -> "re.Pattern | None":
         return None
 
 
-class _HighlightDelegate(QStyledItemDelegate):
-    """Paints cells matching the search term with a highlight background.
+class _WrapHighlightDelegate(QStyledItemDelegate):
+    """Cell delegate: word-wrap aware sizing + search-term highlight.
 
-    Done in a delegate (not via the model's BackgroundRole) because the table's
-    stylesheet overrides item BackgroundRole, so model-set colors never render.
+    sizeHint respects the column width so Qt can compute correct row heights
+    when word-wrap is enabled. Highlight paint overrides the background for
+    cells that match the active search pattern.
     """
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._pattern: "re.Pattern | None" = None
+        self._wrap: bool = True  # False = single-line (expanded mode)
 
     def set_pattern(self, pattern) -> None:
         self._pattern = pattern
 
+    def set_wrap(self, wrap: bool) -> None:
+        self._wrap = wrap
+
+    def sizeHint(self, option, index) -> "QSize":
+        text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
+        if not self._wrap:
+            return super().sizeHint(option, index)
+        from PySide6.QtCore import QSize
+        fm = option.fontMetrics
+        padding_h = Spacing.SM * 2
+        padding_v = 4 * 2
+        col_w = option.rect.width() if option.rect.width() > 0 else 120
+        text_w = max(col_w - padding_h, 20)
+        bound = fm.boundingRect(
+            0, 0, text_w, 0,
+            int(Qt.TextFlag.TextWordWrap | Qt.AlignmentFlag.AlignLeft),
+            text,
+        )
+        return QSize(col_w, bound.height() + padding_v)
+
     def paint(self, painter, option, index) -> None:
         text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
         if self._pattern is not None and self._pattern.search(text):
-            # Read colors live so the highlight follows the active theme.
             painter.save()
             painter.fillRect(option.rect, QColor(Colors.WARNING))
             painter.setPen(QColor(Colors.BG_BASE))
-            rect = option.rect.adjusted(Spacing.MD, 0, -Spacing.SM, 0)
-            painter.drawText(
-                rect,
-                int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
-                text,
-            )
+            rect = option.rect.adjusted(Spacing.SM, 4, -Spacing.SM, -4)
+            flags = int(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            if self._wrap:
+                flags |= int(Qt.TextFlag.TextWordWrap)
+            painter.drawText(rect, flags, text)
             painter.restore()
         else:
-            super().paint(painter, option, index)
+            if self._wrap:
+                # Let Qt draw normally; word wrap is handled via sizeHint + setWordWrap.
+                super().paint(painter, option, index)
+            else:
+                super().paint(painter, option, index)
 
 
 class QueriesPage(QWidget):
@@ -319,6 +343,22 @@ class QueriesPage(QWidget):
 
         layout.addWidget(self._build_results(), 1)
 
+        # Top bar: layout toggle (left) — visible only when grid has results.
+        self._top_bar = QWidget()
+        self._top_bar.setVisible(False)
+        top_layout = QHBoxLayout(self._top_bar)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(Spacing.SM)
+        self._layout_toggle_btn = secondary_button("⇔  Genişlet")
+        self._layout_toggle_btn.setToolTip(
+            "Kolonları yatay kaydırmalı tam genişliğe al (tekrar tıkla: sığdır)"
+        )
+        self._grid_expanded = False
+        self._layout_toggle_btn.clicked.connect(self._toggle_grid_layout)
+        top_layout.addWidget(self._layout_toggle_btn)
+        top_layout.addStretch()
+        layout.addWidget(self._top_bar)
+
         # Bottom bar: full-text search (left) + export buttons (right).
         bottom_bar = QWidget()
         bottom_bar.setVisible(False)
@@ -361,9 +401,11 @@ class QueriesPage(QWidget):
         self._table.setSortingEnabled(True)
         self._table.setAlternatingRowColors(True)
         self._table.verticalHeader().setVisible(False)
+        self._table.setWordWrap(True)
+        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self._proxy = QSortFilterProxyModel(self)
         self._table.setModel(self._proxy)
-        self._highlight_delegate = _HighlightDelegate(self._table)
+        self._highlight_delegate = _WrapHighlightDelegate(self._table)
         self._table.setItemDelegate(self._highlight_delegate)
         self._results.insertWidget(_RESULT_GRID, self._table)
 
@@ -807,6 +849,9 @@ class QueriesPage(QWidget):
                 self._table.sortByColumn(result.fields.index(sort_field), order)
             self._results.setCurrentIndex(_RESULT_GRID)
             self._set_grid_search_visible(True)
+            # Defer fit-mode so viewport has correct dimensions after layout.
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, self._apply_fit_mode)
 
         # Persist run stats and refresh the label.
         if self._selected and self._selected.Id:
@@ -842,6 +887,82 @@ class QueriesPage(QWidget):
         self._grid_search.blockSignals(False)
         self._highlight_delegate.set_pattern(None)
         self._bottom_bar.setVisible(visible)
+        self._top_bar.setVisible(visible)
+        if visible:
+            # Always reset to fit mode when new results arrive.
+            self._grid_expanded = False
+            self._layout_toggle_btn.setText("⇔  Genişlet")
+            self._apply_fit_mode()
+
+    def _apply_fit_mode(self) -> None:
+        """Proportional column widths + word wrap + auto row height."""
+        hdr = self._table.horizontalHeader()
+        src = self._proxy.sourceModel()
+        if src is None:
+            return
+        col_count = src.columnCount()
+        if col_count == 0:
+            return
+
+        self._highlight_delegate.set_wrap(True)
+        self._table.setWordWrap(True)
+        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        # Measure content: header text + sample rows (up to 50) for each column.
+        fm = self._table.fontMetrics()
+        sample_rows = min(self._proxy.rowCount(), 50)
+        widths = []
+        for c in range(col_count):
+            header_text = src.horizontalHeaderItem(c).text() if src.horizontalHeaderItem(c) else ""
+            w = fm.horizontalAdvance(header_text) + Spacing.MD * 2
+            for r in range(sample_rows):
+                cell = str(self._proxy.index(r, c).data() or "")
+                # Cap single-cell contribution so one long value doesn't dominate.
+                cw = min(fm.horizontalAdvance(cell) + Spacing.MD * 2, 300)
+                w = max(w, cw)
+            widths.append(max(w, 60))
+
+        total_content = sum(widths)
+        available = self._table.viewport().width()
+        if available < 50:
+            available = self._table.width() - 20
+
+        for c in range(col_count):
+            hdr.setSectionResizeMode(c, hdr.ResizeMode.Fixed)
+            col_w = max(60, int(available * widths[c] / total_content))
+            hdr.resizeSection(c, col_w)
+
+        hdr.setStretchLastSection(True)
+        self._table.resizeRowsToContents()
+
+    def _apply_expand_mode(self) -> None:
+        """Content-sized columns + single line + horizontal scroll."""
+        hdr = self._table.horizontalHeader()
+        src = self._proxy.sourceModel()
+        if src is None:
+            return
+
+        self._highlight_delegate.set_wrap(False)
+        self._table.setWordWrap(False)
+        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        hdr.setStretchLastSection(False)
+
+        col_count = src.columnCount()
+        for c in range(col_count):
+            hdr.setSectionResizeMode(c, hdr.ResizeMode.ResizeToContents)
+
+        self._table.resizeRowsToContents()
+
+    def _toggle_grid_layout(self) -> None:
+        self._grid_expanded = not self._grid_expanded
+        if self._grid_expanded:
+            self._layout_toggle_btn.setText("⊟  Sığdır")
+            self._layout_toggle_btn.setToolTip("Kolonları ekrana sığdır ve metni kaydır")
+            self._apply_expand_mode()
+        else:
+            self._layout_toggle_btn.setText("⇔  Genişlet")
+            self._layout_toggle_btn.setToolTip("Kolonları yatay kaydırmalı tam genişliğe al")
+            self._apply_fit_mode()
 
     def _highlight_matches(self) -> None:
         """Update the highlight pattern as the user types (substring + wildcards)."""
