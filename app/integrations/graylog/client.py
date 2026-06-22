@@ -83,11 +83,10 @@ class GraylogClient:
         fields: list[str],
         size: int,
     ) -> list[dict[str, str]]:
-        """Run a message search via POST /search/messages (Graylog 5.x Scripting API).
+        """Run a message search, auto-detecting Graylog API version.
 
-        Request/response shape verified against Graylog 5.2.12: the body uses
-        ``query`` / ``fields`` / ``size``, and the CSV header columns come back
-        prefixed with ``"field: "`` (stripped here so keys match ``fields``).
+        Tries the 5.x Scripting API first (POST /search/messages, CSV).
+        Falls back to the Graylog 2.x universal search API on 404.
         """
         body = {
             "query": query_string,
@@ -96,8 +95,14 @@ class GraylogClient:
             "fields": fields,
         }
         if size and size > 0:
-            body["size"] = size  # size <= 0 → omit limit, fetch all matching messages
+            body["size"] = size
+
         response = self._request("POST", "/search/messages", accept="text/csv", json=body)
+
+        if response.status_code == 404:
+            # Graylog 2.x — fall back to universal search REST API.
+            return self._execute_search_legacy(query_string, streams, timerange, fields, size)
+
         response.raise_for_status()
 
         import csv
@@ -105,7 +110,62 @@ class GraylogClient:
 
         reader = csv.reader(io.StringIO(response.text))
         try:
-            header = [column.removeprefix("field: ") for column in next(reader)]
+            header = [col.removeprefix("field: ") for col in next(reader)]
         except StopIteration:
             return []
         return [dict(zip(header, row)) for row in reader]
+
+    def _execute_search_legacy(
+        self,
+        query_string: str,
+        streams: list[str],
+        timerange: dict,
+        fields: list[str],
+        size: int,
+    ) -> list[dict[str, str]]:
+        """Graylog 2.x universal search API.
+
+        Endpoints:
+          GET /search/universal/relative  — timerange.type == "relative"
+          GET /search/universal/absolute  — timerange.type == "absolute"
+          GET /search/universal/keyword   — timerange.type == "keyword"
+
+        Response: {"messages": [{"message": {...}}, ...]}
+        """
+        tr_type = timerange.get("type", "relative")
+
+        params: dict = {
+            "query": query_string,
+            "limit": size if size > 0 else 150,
+        }
+        if streams:
+            params["filter"] = "streams:" + ",".join(streams)
+        if fields:
+            params["fields"] = ",".join(fields)
+
+        if tr_type == "relative":
+            params["range"] = timerange.get("range", 300)
+            path = "/search/universal/relative"
+        elif tr_type == "absolute":
+            params["from"] = timerange.get("from", "")
+            params["to"] = timerange.get("to", "")
+            path = "/search/universal/absolute"
+        else:  # keyword
+            params["keyword"] = timerange.get("keyword", "last 5 minutes")
+            path = "/search/universal/keyword"
+
+        response = self._request("GET", path, params=params)
+        response.raise_for_status()
+        payload = response.json()
+
+        messages = payload.get("messages", [])
+        if not messages:
+            return []
+
+        # Determine output columns: requested fields or all fields from first message.
+        first_msg = messages[0].get("message", {})
+        cols = fields if fields else sorted(first_msg.keys())
+        return [
+            {col: str(msg.get("message", {}).get(col, "")) for col in cols}
+            for msg in messages
+        ]
