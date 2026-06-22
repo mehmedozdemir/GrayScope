@@ -34,6 +34,7 @@ class Query:
     DefaultSortField: str | None = None
     DefaultSortOrder: SortOrder | None = None
     FolderId: int | None = None  # None = root level (no folder)
+    Position: int = 0
     Id: int | None = None
     CreatedAt: datetime | None = None
     UpdatedAt: datetime | None = None

@@ -7,7 +7,10 @@ from app.data.models.query_folder import QueryFolder
 
 
 def _row_to_model(row: sqlite3.Row) -> QueryFolder:
-    return QueryFolder(Id=row["Id"], Name=row["Name"], ParentId=row["ParentId"])
+    return QueryFolder(
+        Id=row["Id"], Name=row["Name"], ParentId=row["ParentId"],
+        Position=row["Position"] if "Position" in row.keys() else 0,
+    )
 
 
 class QueryFolderRepository:
@@ -16,8 +19,8 @@ class QueryFolderRepository:
 
     def create(self, folder: QueryFolder) -> QueryFolder:
         cursor = self._conn.execute(
-            "INSERT INTO QueryFolder (Name, ParentId) VALUES (?, ?)",
-            (folder.Name, folder.ParentId),
+            "INSERT INTO QueryFolder (Name, ParentId, Position) VALUES (?, ?, ?)",
+            (folder.Name, folder.ParentId, folder.Position),
         )
         self._conn.commit()
         folder.Id = cursor.lastrowid
@@ -25,9 +28,17 @@ class QueryFolderRepository:
 
     def get_all(self) -> list[QueryFolder]:
         rows = self._conn.execute(
-            "SELECT * FROM QueryFolder ORDER BY Name COLLATE NOCASE"
+            "SELECT * FROM QueryFolder ORDER BY Position, Name COLLATE NOCASE"
         ).fetchall()
         return [_row_to_model(r) for r in rows]
+
+    def update_positions(self, items: list[tuple[int, int | None, int]]) -> None:
+        """Bulk update (folder_id, parent_id, position) for each folder."""
+        self._conn.executemany(
+            "UPDATE QueryFolder SET ParentId = ?, Position = ? WHERE Id = ?",
+            [(parent_id, pos, fid) for fid, parent_id, pos in items],
+        )
+        self._conn.commit()
 
     def rename(self, folder_id: int, name: str) -> None:
         self._conn.execute(

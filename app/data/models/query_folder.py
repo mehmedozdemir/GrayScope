@@ -8,4 +8,5 @@ from dataclasses import dataclass
 class QueryFolder:
     Name: str
     ParentId: int | None = None  # None = root-level folder
+    Position: int = 0
     Id: int | None = None

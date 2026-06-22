@@ -38,6 +38,7 @@ def _row_to_model(row: sqlite3.Row) -> Query:
         ),
         FolderId=row["FolderId"],
         ResultSize=row["ResultSize"],
+        Position=row["Position"] if "Position" in row.keys() else 0,
         CreatedAt=datetime.fromisoformat(row["CreatedAt"]),
         UpdatedAt=datetime.fromisoformat(row["UpdatedAt"]),
         LastRunAt=_dt_or_none(row["LastRunAt"]),
@@ -97,9 +98,17 @@ class QueryRepository:
 
     def get_all(self) -> list[Query]:
         rows = self._conn.execute(
-            "SELECT * FROM Query ORDER BY Name COLLATE NOCASE"
+            "SELECT * FROM Query ORDER BY FolderId, Position, Name COLLATE NOCASE"
         ).fetchall()
         return [_row_to_model(r) for r in rows]
+
+    def update_positions(self, items: list[tuple[int, int | None, int]]) -> None:
+        """Bulk update (query_id, folder_id, position) for each query."""
+        self._conn.executemany(
+            "UPDATE Query SET FolderId = ?, Position = ? WHERE Id = ?",
+            [(folder_id, pos, qid) for qid, folder_id, pos in items],
+        )
+        self._conn.commit()
 
     def get_by_profile(self, profile_id: int) -> list[Query]:
         rows = self._conn.execute(

@@ -62,6 +62,45 @@ _ROLE = Qt.ItemDataRole.UserRole
 _RESULT_IDLE, _RESULT_LOADING, _RESULT_GRID, _RESULT_EMPTY, _RESULT_ERROR = range(5)
 
 
+class _QueryTree(QTreeWidget):
+    """QTreeWidget with drag-and-drop support for reordering and folder assignment.
+
+    Emits ``structure_changed`` after every successful drop so the page can
+    persist the new order to the database without rebuilding the whole tree.
+    """
+
+    structure_changed = Signal()
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+    def dropEvent(self, event) -> None:
+        dragged = self.currentItem()
+        if dragged is None:
+            event.ignore()
+            return
+
+        d_kind, _ = dragged.data(0, _ROLE)
+        target = self.itemAt(event.position().toPoint())
+        indicator = self.dropIndicatorPosition()
+
+        # Prevent dropping onto a query item (only folders or viewport are valid parents).
+        if target is not None:
+            t_kind, _ = target.data(0, _ROLE)
+            if indicator == QAbstractItemView.DropIndicatorPosition.OnItem and t_kind == "query":
+                event.ignore()
+                return
+
+        super().dropEvent(event)
+        self.expandAll()
+        self.structure_changed.emit()
+
+
 class _ExecutionWorker(QThread):
     succeeded = Signal(object)           # ExecutionResult
     failed = Signal(str, str)            # (user_message, detail)
@@ -203,7 +242,7 @@ class QueriesPage(QWidget):
         layout.addWidget(self._new_button)
 
         self._tree_stack = QStackedWidget()
-        self._tree = QTreeWidget()
+        self._tree = _QueryTree()
         self._tree.setHeaderHidden(True)
         self._tree.setIndentation(10)
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -431,6 +470,7 @@ class QueriesPage(QWidget):
         self._tree.currentItemChanged.connect(self._on_select)
         self._tree.customContextMenuRequested.connect(self._on_tree_menu)
         self._sidebar_toggle_btn.clicked.connect(self._toggle_sidebar)
+        self._tree.structure_changed.connect(self._sync_tree_to_db)
         self._action_settings.triggered.connect(self._open_settings)
         self._theme_button.clicked.connect(self._toggle_theme)
         self._action_backup.triggered.connect(self._on_backup)
@@ -478,7 +518,7 @@ class QueriesPage(QWidget):
         folder_items: dict[int, QTreeWidgetItem] = {}
 
         def add_folders(parent_id: int | None, parent_item: QTreeWidgetItem) -> None:
-            for folder in sorted(by_parent.get(parent_id, []), key=lambda f: f.Name.lower()):
+            for folder in sorted(by_parent.get(parent_id, []), key=lambda f: (f.Position, f.Name.lower())):
                 item = QTreeWidgetItem(parent_item, [f"\U0001F4C1  {folder.Name}"])
                 item.setData(0, _ROLE, ("folder", folder.Id))
                 folder_items[folder.Id] = item
@@ -613,6 +653,40 @@ class QueriesPage(QWidget):
         if warnings:
             msg += "  (" + "; ".join(warnings[:2]) + ("…" if len(warnings) > 2 else "") + ")"
         show_toast(self, msg, "success" if added else "warning")
+
+    def _sync_tree_to_db(self) -> None:
+        """Read the current tree visual order and persist FolderId/Position to DB."""
+        query_updates: list[tuple[int, int | None, int]] = []
+        folder_updates: list[tuple[int, int | None, int]] = []
+
+        def walk(parent_item: QTreeWidgetItem, parent_folder_id: int | None) -> None:
+            for i in range(parent_item.childCount()):
+                child = parent_item.child(i)
+                kind, ident = child.data(0, _ROLE)
+                if kind == "query":
+                    query_updates.append((ident, parent_folder_id, i))
+                elif kind == "folder":
+                    folder_updates.append((ident, parent_folder_id, i))
+                    walk(child, ident)
+
+        root = self._tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            item = root.child(i)
+            kind, ident = item.data(0, _ROLE)
+            if kind == "query":
+                query_updates.append((ident, None, i))
+            elif kind == "folder":
+                folder_updates.append((ident, None, i))
+                walk(item, ident)
+
+        if query_updates:
+            self._queries_repo.update_positions(query_updates)
+        if folder_updates:
+            self._folders_repo.update_positions(folder_updates)
+
+        # Refresh in-memory lists to stay consistent.
+        self._queries = self._queries_repo.get_all()
+        self._folders = self._folders_repo.get_all()
 
     def _toggle_sidebar(self) -> None:
         sizes = self._splitter.sizes()

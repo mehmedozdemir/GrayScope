@@ -69,6 +69,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE Query ADD COLUMN LastRunAt TEXT")
     if "LastRunCount" not in columns:
         conn.execute("ALTER TABLE Query ADD COLUMN LastRunCount INTEGER")
+    if "Position" not in columns:
+        conn.execute("ALTER TABLE Query ADD COLUMN Position INTEGER NOT NULL DEFAULT 0")
+    folder_cols = {row["name"] for row in conn.execute("PRAGMA table_info(QueryFolder)")}
+    if "Position" not in folder_cols:
+        conn.execute("ALTER TABLE QueryFolder ADD COLUMN Position INTEGER NOT NULL DEFAULT 0")
     # Legacy {Plaka} placeholder → {NetworkId}.
     conn.execute(
         "UPDATE Query SET QueryTemplate = REPLACE(QueryTemplate, '{Plaka}', '{NetworkId}')"
