@@ -531,19 +531,21 @@ class QueriesPage(QWidget):
         item = self._tree.itemAt(pos)
         menu = QMenu(self)
         if item is None:
-            menu.addAction("Yeni Klasör", lambda: self._new_folder(None))
+            menu.addAction("📁  Yeni Klasör", lambda: self._new_folder(None))
         else:
             kind, ident = item.data(0, _ROLE)
             if kind == "folder":
-                menu.addAction("Yeni Alt Klasör", lambda: self._new_folder(ident))
-                menu.addAction("Yeniden Adlandır", lambda: self._rename_folder(ident))
+                menu.addAction("📁  Yeni Alt Klasör", lambda: self._new_folder(ident))
+                menu.addAction("✎  Yeniden Adlandır", lambda: self._rename_folder(ident))
                 menu.addSeparator()
-                menu.addAction("Sil", lambda: self._delete_folder(ident))
+                menu.addAction("🗑  Sil", lambda: self._delete_folder(ident))
             else:
-                menu.addAction("Düzenle", self._on_edit)
-                menu.addAction("Kopyala", lambda qid=ident: self._copy_query(qid))
+                menu.addAction("▶  Çalıştır", self._on_run)
                 menu.addSeparator()
-                menu.addAction("Sil", self._on_delete)
+                menu.addAction("✎  Düzenle", self._on_edit)
+                menu.addAction("⧉  Kopyala", lambda qid=ident: self._copy_query(qid))
+                menu.addSeparator()
+                menu.addAction("🗑  Sil", self._on_delete)
         menu.exec(self._tree.viewport().mapToGlobal(pos))
 
     def _new_folder(self, parent_id: int | None) -> None:
