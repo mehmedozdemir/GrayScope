@@ -63,21 +63,25 @@ _RESULT_IDLE, _RESULT_LOADING, _RESULT_GRID, _RESULT_EMPTY, _RESULT_ERROR = rang
 
 
 class _ExecutionWorker(QThread):
-    succeeded = Signal(object)  # ExecutionResult
-    failed = Signal(str)
+    succeeded = Signal(object)           # ExecutionResult
+    failed = Signal(str, str)            # (user_message, detail)
 
     def __init__(self, profile, query, stream_ids, params, parent=None) -> None:
         super().__init__(parent)
         self._args = (profile, query, stream_ids, params)
 
     def run(self) -> None:
+        import traceback
         try:
             result = execute_query(*self._args)
         except (GraylogError, GrayScopeError) as exc:
-            self.failed.emit(str(exc))
+            self.failed.emit(str(exc), traceback.format_exc())
             return
         except Exception:  # noqa: BLE001
-            self.failed.emit("Sorgu çalıştırılırken beklenmeyen bir hata oluştu.")
+            self.failed.emit(
+                "Sorgu çalıştırılırken beklenmeyen bir hata oluştu.",
+                traceback.format_exc(),
+            )
             return
         self.succeeded.emit(result)
 
@@ -888,13 +892,85 @@ class QueriesPage(QWidget):
         )
         self._run_history_label.setVisible(True)
 
-    def _on_run_failed(self, message: str) -> None:
+    def _on_run_failed(self, message: str, detail: str = "") -> None:
+        import logging
+        _log = logging.getLogger(__name__)
+        _log.error("Query execution failed: %s\n%s", message, detail)
+
         self._set_grid_search_visible(False)
-        # Rebuild the error empty-state with the actual message.
         self._results.removeWidget(self._error_state)
-        self._error_state = EmptyState("⚠", "Sorgu çalıştırılamadı", message)
+        self._error_state = self._build_error_state(message, detail)
         self._results.insertWidget(_RESULT_ERROR, self._error_state)
         self._results.setCurrentIndex(_RESULT_ERROR)
+
+    def _build_error_state(self, message: str, detail: str) -> QWidget:
+        from PySide6.QtWidgets import QVBoxLayout, QHBoxLayout
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(Spacing.SM)
+
+        icon = QLabel("⚠")
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setStyleSheet("font-size: 32px;")
+
+        title = QLabel("Sorgu çalıştırılamadı")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setProperty("class", "empty-state-title")
+
+        msg = QLabel(message)
+        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        msg.setWordWrap(True)
+        msg.setProperty("class", "empty-state-subtitle")
+        msg.setMaximumWidth(480)
+
+        layout.addWidget(icon)
+        layout.addWidget(title)
+        layout.addWidget(msg)
+
+        if detail:
+            btn_row = QHBoxLayout()
+            btn_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            detail_btn = secondary_button("Hata Detayı")
+            detail_btn.setToolTip("Hatanın teknik detaylarını göster ve kopyala")
+            detail_btn.clicked.connect(lambda: self._show_error_detail(message, detail))
+            btn_row.addWidget(detail_btn)
+            layout.addLayout(btn_row)
+
+        return container
+
+    def _show_error_detail(self, message: str, detail: str) -> None:
+        from PySide6.QtWidgets import (
+            QDialog, QVBoxLayout, QHBoxLayout, QPlainTextEdit, QDialogButtonBox
+        )
+        from PySide6.QtGui import QClipboard
+        dlg = QDialog(self.window())
+        dlg.setWindowTitle("Hata Detayı")
+        dlg.setMinimumSize(600, 380)
+        layout = QVBoxLayout(dlg)
+        layout.setSpacing(Spacing.SM)
+
+        summary = QLabel(message)
+        summary.setWordWrap(True)
+        summary.setProperty("class", "error-text")
+        layout.addWidget(summary)
+
+        text_area = QPlainTextEdit()
+        text_area.setPlainText(detail)
+        text_area.setReadOnly(True)
+        text_area.setProperty("mono", "true")
+        layout.addWidget(text_area, 1)
+
+        btn_box = QDialogButtonBox()
+        copy_btn = btn_box.addButton("Kopyala", QDialogButtonBox.ButtonRole.ActionRole)
+        close_btn = btn_box.addButton("Kapat", QDialogButtonBox.ButtonRole.RejectRole)
+        copy_btn.clicked.connect(
+            lambda: QApplication.clipboard().setText(f"{message}\n\n{detail}")
+        )
+        close_btn.clicked.connect(dlg.reject)
+        layout.addWidget(btn_box)
+
+        dlg.exec()
 
     def _set_grid_search_visible(self, visible: bool) -> None:
         self._grid_search.blockSignals(True)
