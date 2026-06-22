@@ -172,13 +172,14 @@ class QueriesPage(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self._build_master())
-        splitter.addWidget(self._build_detail())
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([400, 880])
-        layout.addWidget(splitter)
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter.addWidget(self._build_master())
+        self._splitter.addWidget(self._build_detail())
+        self._splitter.setStretchFactor(0, 0)
+        self._splitter.setStretchFactor(1, 1)
+        self._splitter.setSizes([400, 880])
+        self._sidebar_sizes = [400, 880]  # last known open sizes
+        layout.addWidget(self._splitter)
 
         self._connect_signals()
         self.load_data()
@@ -200,6 +201,7 @@ class QueriesPage(QWidget):
         self._tree_stack = QStackedWidget()
         self._tree = QTreeWidget()
         self._tree.setHeaderHidden(True)
+        self._tree.setIndentation(10)
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree_empty = EmptyState(
             "\U0001F50E", "Henüz sorgu yok", "Yeni bir sorgu oluşturarak başlayın."
@@ -253,11 +255,13 @@ class QueriesPage(QWidget):
         layout.setSpacing(Spacing.SM)
 
         header = QHBoxLayout()
+        self._sidebar_toggle_btn = icon_button("☰", "Sol paneli gizle / göster")
         self._title = QLabel()
         self._title.setProperty("class", "detail-title")
         self._edit_button = icon_button("✎", "Düzenle")
         self._copy_button = icon_button("⧉", "Kopyala (çoğalt)")
         self._delete_button = icon_button("🗑", "Sil")
+        header.addWidget(self._sidebar_toggle_btn)
         header.addWidget(self._title)
         header.addStretch()
         header.addWidget(self._edit_button)
@@ -422,6 +426,7 @@ class QueriesPage(QWidget):
         self._new_button.clicked.connect(self._on_new)
         self._tree.currentItemChanged.connect(self._on_select)
         self._tree.customContextMenuRequested.connect(self._on_tree_menu)
+        self._sidebar_toggle_btn.clicked.connect(self._toggle_sidebar)
         self._action_settings.triggered.connect(self._open_settings)
         self._theme_button.clicked.connect(self._toggle_theme)
         self._action_backup.triggered.connect(self._on_backup)
@@ -602,6 +607,16 @@ class QueriesPage(QWidget):
         if warnings:
             msg += "  (" + "; ".join(warnings[:2]) + ("…" if len(warnings) > 2 else "") + ")"
         show_toast(self, msg, "success" if added else "warning")
+
+    def _toggle_sidebar(self) -> None:
+        sizes = self._splitter.sizes()
+        if sizes[0] > 0:
+            # Sidebar visible → hide it.
+            self._sidebar_sizes = sizes
+            self._splitter.setSizes([0, sizes[0] + sizes[1]])
+        else:
+            # Sidebar hidden → restore.
+            self._splitter.setSizes(self._sidebar_sizes)
 
     def _open_settings(self) -> None:
         SettingsDialog(self._conn, self).exec()
@@ -833,7 +848,7 @@ class QueriesPage(QWidget):
             model.setHorizontalHeaderLabels(result.fields)
             for r, row in enumerate(result.rows):
                 for c, field in enumerate(result.fields):
-                    item = QStandardItem(str(row.get(field, "")))
+                    item = QStandardItem(str(row.get(field, "")).replace('\\"', '"'))
                     item.setEditable(False)
                     model.setItem(r, c, item)
             self._proxy.setSourceModel(model)  # replaces previous result (FR-Query-Run-02)
