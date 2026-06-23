@@ -237,22 +237,13 @@ class QueriesPage(QWidget):
         layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
         layout.setSpacing(Spacing.SM)
 
+        # Search row: [🔍 Sorgu ara ──────────] [⚙]
+        search_row = QHBoxLayout()
+        search_row.setContentsMargins(0, 0, 0, 0)
+        search_row.setSpacing(Spacing.XS)
+
         self._search = SearchInput("Sorgu ara")
-        layout.addWidget(self._search)
-
-        # Action row: [+ Yeni Sorgu] ... [⚙] [🌙]
-        action_row = QHBoxLayout()
-        action_row.setContentsMargins(0, 0, 0, 0)
-        action_row.setSpacing(Spacing.XS)
-
-        self._new_button = primary_button("+ Yeni Sorgu")
-
         self._settings_button = icon_button("⚙", "Ayarlar")
-        is_dark = _theme.current_theme() == "dark"
-        self._theme_button = icon_button(
-            "☀" if is_dark else "🌙",
-            "Açık temaya geç" if is_dark else "Koyu temaya geç",
-        )
 
         from PySide6.QtWidgets import QMenu
         settings_menu = QMenu(self)
@@ -260,13 +251,19 @@ class QueriesPage(QWidget):
         settings_menu.addSeparator()
         self._action_backup = settings_menu.addAction("⬆  Sorguları Yedekle")
         self._action_restore = settings_menu.addAction("⬇  Yedeği Yükle")
+        settings_menu.addSeparator()
+        theme_menu = settings_menu.addMenu("🎨  Tema")
+        self._action_theme_light = theme_menu.addAction("☀  Açık")
+        self._action_theme_dark = theme_menu.addAction("🌙  Koyu")
         self._settings_button.setMenu(settings_menu)
         self._settings_button.clicked.connect(self._settings_button.showMenu)
 
-        action_row.addWidget(self._new_button, 1)
-        action_row.addWidget(self._settings_button)
-        action_row.addWidget(self._theme_button)
-        layout.addLayout(action_row)
+        search_row.addWidget(self._search, 1)
+        search_row.addWidget(self._settings_button)
+        layout.addLayout(search_row)
+
+        self._new_button = primary_button("+ Yeni Sorgu")
+        layout.addWidget(self._new_button)
 
         self._tree_stack = QStackedWidget()
         self._tree = _QueryTree()
@@ -475,7 +472,8 @@ class QueriesPage(QWidget):
         self._sidebar_toggle_btn.clicked.connect(self._toggle_sidebar)
         self._tree.structure_changed.connect(self._sync_tree_to_db)
         self._action_settings.triggered.connect(self._open_settings)
-        self._theme_button.clicked.connect(self._toggle_theme)
+        self._action_theme_light.triggered.connect(lambda: self._set_theme("light"))
+        self._action_theme_dark.triggered.connect(lambda: self._set_theme("dark"))
         self._action_backup.triggered.connect(self._on_backup)
         self._action_restore.triggered.connect(self._on_restore)
         self._edit_button.clicked.connect(self._on_edit)
@@ -713,15 +711,11 @@ class QueriesPage(QWidget):
         SettingsDialog(self._conn, self).exec()
         self.load_data()  # profiles/customers may have changed
 
-    def _toggle_theme(self) -> None:
+    def _set_theme(self, mode: str) -> None:
         from PySide6.QtCore import QSettings
 
-        new_mode = "light" if _theme.current_theme() == "dark" else "dark"
-        _apply_theme(QApplication.instance(), new_mode)
-        QSettings("GrayScope", "GrayScope").setValue("theme", new_mode)
-        is_dark = new_mode == "dark"
-        self._theme_button.setText("☀" if is_dark else "🌙")
-        self._theme_button.setToolTip("Açık temaya geç" if is_dark else "Koyu temaya geç")
+        _apply_theme(QApplication.instance(), mode)
+        QSettings("GrayScope", "GrayScope").setValue("theme", mode)
         self._table.viewport().update()
 
     def _populate_stream_badges(self, query: Query) -> None:
