@@ -347,6 +347,7 @@ class QueriesPage(QWidget):
         self._params_layout.setContentsMargins(0, 0, 0, 0)
         self._params_layout.setSpacing(Spacing.MD)
         self._param_fields: dict[str, QLineEdit] = {}
+        self._param_optional: set[str] = set()
         panel_layout.addWidget(self._params_row)
 
         self._param_separator = QFrame()
@@ -768,15 +769,20 @@ class QueriesPage(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         self._param_fields = {}
+        self._param_optional: set[str] = set()
 
-        for name, default in specs:
+        for name, default, is_optional in specs:
             field = QLineEdit()
             field.setMinimumWidth(140)
-            field.setText(previous.get(name, default))  # keep value, else use default
+            field.setText(previous.get(name, default))
+            if is_optional:
+                field.setPlaceholderText("opsiyonel")
+                self._param_optional.add(name)
             field.textChanged.connect(self._update_run_enabled)
-            field.returnPressed.connect(self._run_button.click)  # Enter → Çalıştır
+            field.returnPressed.connect(self._run_button.click)
             self._param_fields[name] = field
-            self._params_layout.addWidget(labeled_field(name, field))
+            label = f"{name} (opsiyonel)" if is_optional else name
+            self._params_layout.addWidget(labeled_field(label, field))
         self._params_layout.addStretch()
 
         has_params = bool(specs)
@@ -787,9 +793,15 @@ class QueriesPage(QWidget):
     def _update_run_enabled(self) -> None:
         if self._selected is None:
             return
-        all_filled = all(field.text().strip() for field in self._param_fields.values())
-        self._run_button.setEnabled(all_filled)
-        self._run_button.setToolTip("" if all_filled else "Önce tüm parametreleri doldurun")
+        required_filled = all(
+            field.text().strip()
+            for name, field in self._param_fields.items()
+            if name not in self._param_optional
+        )
+        self._run_button.setEnabled(required_filled)
+        self._run_button.setToolTip(
+            "" if required_filled else "Önce zorunlu parametreleri doldurun"
+        )
 
     # ── CRUD ─────────────────────────────────────────────────────────────
     def _active_profiles(self):

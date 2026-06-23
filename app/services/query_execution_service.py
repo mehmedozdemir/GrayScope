@@ -19,10 +19,13 @@ from app.data.models.graylog_profile import GraylogProfile
 from app.data.models.query import Query, TimeRangeType
 from app.integrations.graylog.client import GraylogClient
 
-# A parameter is {Identifier} with an optional ":defaultValue", e.g. {NetworkId}
-# or {region:TR-34}. Identifier-only names keep Lucene ranges like {1 TO 5} from
-# being mistaken for parameters.
-PARAM_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)(?::([^{}]*))?\}")
+# {Name}    → required parameter
+# {Name?}   → optional, substituted with * when empty
+# {Name:v}  → required with default value v
+# {Name?:v} → optional with default value v (used when empty)
+# Identifier-only names keep Lucene ranges like {1 TO 5} from being mistaken
+# for parameters.
+PARAM_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)(\?)?(?::([^{}]*))?\}")
 
 
 @dataclass
@@ -31,28 +34,35 @@ class ExecutionResult:
     rows: list[dict[str, str]]
 
 
-def extract_parameters(template: str) -> list[tuple[str, str]]:
-    """Distinct ``(name, default)`` parameters in ``template``, in first-seen order.
+def extract_parameters(template: str) -> list[tuple[str, str, bool]]:
+    """Distinct ``(name, default, is_optional)`` parameters in ``template``, first-seen order.
 
-    ``default`` is "" when the token has no ``:defaultValue`` part.
+    ``default`` is "" when no ``:defaultValue`` is given.
+    ``is_optional`` is True when the token uses the ``?`` marker (e.g. ``{City?}``).
     """
-    defaults: dict[str, str] = {}
+    seen: dict[str, tuple[str, bool]] = {}
     order: list[str] = []
     for match in PARAM_RE.finditer(template or ""):
         name = match.group(1)
-        if name not in defaults:
-            defaults[name] = match.group(2) or ""
+        if name not in seen:
+            is_optional = match.group(2) == "?"
+            default = match.group(3) or ""
+            seen[name] = (default, is_optional)
             order.append(name)
-    return [(name, defaults[name]) for name in order]
+    return [(name, seen[name][0], seen[name][1]) for name in order]
 
 
 def _build_query_string(template: str, params: dict[str, str]) -> str:
     def replace(match: re.Match) -> str:
         name = match.group(1)
-        value = params.get(name, "")
-        if value == "" or value is None:
+        is_optional = match.group(2) == "?"
+        default = match.group(3) or ""
+        value = (params.get(name) or "").strip()
+        if not value:
+            if is_optional:
+                return default if default else "*"
             raise QueryValidationError(f"'{name}' parametresi için bir değer girin.")
-        return str(value)
+        return value
 
     return PARAM_RE.sub(replace, template)
 
