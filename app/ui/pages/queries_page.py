@@ -631,7 +631,11 @@ class QueriesPage(QWidget):
         import json
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        show_toast(self, f"{len(data['queries'])} sorgu JSON olarak kaydedildi.", "success")
+        show_toast(
+            self,
+            f"{len(data['profiles'])} profil, {len(data['queries'])} sorgu JSON olarak kaydedildi.",
+            "success",
+        )
 
     def _on_restore(self) -> None:
         from PySide6.QtWidgets import QFileDialog
@@ -645,12 +649,16 @@ class QueriesPage(QWidget):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            added, skipped, warnings = import_backup(self._conn, data)
+            profiles_added, added, skipped, warnings = import_backup(self._conn, data)
         except Exception as exc:
             show_toast(self, f"Yedek yüklenemedi: {exc}", "error")
             return
         self.load_data()
-        msg = f"{added} sorgu eklendi, {skipped} atlandı."
+        parts = []
+        if profiles_added:
+            parts.append(f"{profiles_added} profil eklendi")
+        parts.append(f"{added} sorgu eklendi, {skipped} atlandı")
+        msg = ", ".join(parts) + "."
         if warnings:
             msg += "  (" + "; ".join(warnings[:2]) + ("…" if len(warnings) > 2 else "") + ")"
         show_toast(self, msg, "success" if added else "warning")
