@@ -238,25 +238,15 @@ class QueriesPage(QWidget):
         layout.setSpacing(Spacing.SM)
 
         self._search = SearchInput("Sorgu ara")
-        self._new_button = primary_button("+ Yeni Sorgu")
         layout.addWidget(self._search)
-        layout.addWidget(self._new_button)
 
-        self._tree_stack = QStackedWidget()
-        self._tree = _QueryTree()
-        self._tree.setHeaderHidden(True)
-        self._tree.setIndentation(10)
-        self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self._tree_empty = EmptyState(
-            "\U0001F50E", "Henüz sorgu yok", "Yeni bir sorgu oluşturarak başlayın."
-        )
-        self._tree_stack.addWidget(self._tree)
-        self._tree_stack.addWidget(self._tree_empty)
-        layout.addWidget(self._tree_stack, 1)
+        # Action row: [+ Yeni Sorgu] ... [⚙] [🌙]
+        action_row = QHBoxLayout()
+        action_row.setContentsMargins(0, 0, 0, 0)
+        action_row.setSpacing(Spacing.XS)
 
-        # Bottom corner: settings dropdown + theme toggle.
-        bottom = QHBoxLayout()
-        bottom.setContentsMargins(0, 0, 0, 0)
+        self._new_button = primary_button("+ Yeni Sorgu")
+
         self._settings_button = icon_button("⚙", "Ayarlar")
         is_dark = _theme.current_theme() == "dark"
         self._theme_button = icon_button(
@@ -273,10 +263,22 @@ class QueriesPage(QWidget):
         self._settings_button.setMenu(settings_menu)
         self._settings_button.clicked.connect(self._settings_button.showMenu)
 
-        bottom.addWidget(self._settings_button)
-        bottom.addStretch()
-        bottom.addWidget(self._theme_button)
-        layout.addLayout(bottom)
+        action_row.addWidget(self._new_button, 1)
+        action_row.addWidget(self._settings_button)
+        action_row.addWidget(self._theme_button)
+        layout.addLayout(action_row)
+
+        self._tree_stack = QStackedWidget()
+        self._tree = _QueryTree()
+        self._tree.setHeaderHidden(True)
+        self._tree.setIndentation(10)
+        self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._tree_empty = EmptyState(
+            "\U0001F50E", "Henüz sorgu yok", "Yeni bir sorgu oluşturarak başlayın."
+        )
+        self._tree_stack.addWidget(self._tree)
+        self._tree_stack.addWidget(self._tree_empty)
+        layout.addWidget(self._tree_stack, 1)
         return panel
 
     # ── detail (right) ──────────────────────────────────────────────────
