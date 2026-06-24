@@ -752,22 +752,65 @@ class QueriesPage(QWidget):
     # ── settings & theme ─────────────────────────────────────────────────
     # ── backup / restore ────────────────────────────────────────────────────
     def _on_backup(self) -> None:
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import (
+            QFileDialog, QDialog, QVBoxLayout, QHBoxLayout,
+            QLabel, QCheckBox, QPushButton,
+        )
         from app.services.backup_service import export_backup
         from datetime import datetime
+
+        # ── Seçenek dialog'u ────────────────────────────────────────────
+        opt = QDialog(self)
+        opt.setWindowTitle("Yedekleme Seçenekleri")
+        opt.setFixedWidth(380)
+        vlay = QVBoxLayout(opt)
+        vlay.setSpacing(12)
+        vlay.setContentsMargins(20, 20, 20, 20)
+
+        lbl = QLabel("Yedeklemeye dahil edilecek bilgileri seçin:")
+        lbl.setWordWrap(True)
+        vlay.addWidget(lbl)
+
+        chk_tokens = QCheckBox("Graylog token değerlerini dahil et")
+        chk_tokens.setChecked(False)
+        chk_tokens.setToolTip(
+            "Token'lar şifreli olarak saklanır. Farklı bir makinede\n"
+            "geri yüklenirse token çözümlenemez ve yeniden girilmesi gerekir."
+        )
+        vlay.addWidget(chk_tokens)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_devam = QPushButton("Devam")
+        btn_devam.setDefault(True)
+        btn_iptal = QPushButton("İptal")
+        btn_row.addWidget(btn_iptal)
+        btn_row.addWidget(btn_devam)
+        vlay.addLayout(btn_row)
+
+        btn_devam.clicked.connect(opt.accept)
+        btn_iptal.clicked.connect(opt.reject)
+
+        if opt.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        include_tokens = chk_tokens.isChecked()
+
+        # ── Dosya kayıt dialog'u ─────────────────────────────────────────
         default_name = f"grayscope_yedek_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
         path, _ = QFileDialog.getSaveFileName(
             self, "Sorguları Yedekle", default_name, "JSON Dosyası (*.json)"
         )
         if not path:
             return
-        data = export_backup(self._conn)
+        data = export_backup(self._conn, include_tokens=include_tokens)
         import json
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        token_notu = " (token dahil)" if include_tokens else " (token hariç)"
         show_toast(
             self,
-            f"{len(data['profiles'])} profil, {len(data['queries'])} sorgu JSON olarak kaydedildi.",
+            f"{len(data['profiles'])} profil, {len(data['queries'])} sorgu kaydedildi{token_notu}.",
             "success",
         )
 

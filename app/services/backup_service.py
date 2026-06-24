@@ -61,7 +61,7 @@ _VERSION = 2
 _PLACEHOLDER_TOKEN = "PLACEHOLDER"
 
 
-def export_backup(conn: sqlite3.Connection) -> dict:
+def export_backup(conn: sqlite3.Connection, include_tokens: bool = True) -> dict:
     all_profiles = GraylogProfileRepository(conn).get_all()
     folders = QueryFolderRepository(conn).get_all()
     queries = QueryRepository(conn).get_all()
@@ -83,7 +83,7 @@ def export_backup(conn: sqlite3.Connection) -> dict:
             {
                 "name": p.Name,
                 "base_url": p.BaseUrl,
-                "token_encrypted": p.TokenEncrypted,
+                "token_encrypted": p.TokenEncrypted if include_tokens else "",
                 "is_default": p.IsDefault,
                 "is_active": p.IsActive,
             }
