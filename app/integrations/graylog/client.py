@@ -91,11 +91,12 @@ class GraylogClient:
         For the 5.x CSV path ``all_rows`` equals ``selected_rows`` because the
         CSV response carries only the requested columns.
         """
-        body = {
+        # Do NOT send fields — fetch all columns so the detail view has every
+        # field. selected_rows is filtered client-side to the user's columns.
+        body: dict = {
             "query": query_string,
             "streams": streams,
             "timerange": timerange,
-            "fields": fields,
         }
         if size and size > 0:
             body["size"] = size
@@ -116,9 +117,15 @@ class GraylogClient:
             header = [col.removeprefix("field: ") for col in next(reader)]
         except StopIteration:
             return [], []
-        rows = [dict(zip(header, row)) for row in reader]
-        # 5.x CSV only carries requested fields — all_rows == rows.
-        return rows, rows
+        all_rows = [dict(zip(header, row)) for row in reader]
+
+        # Filter to user-selected columns for the grid; keep all_rows intact.
+        display_cols = [f for f in fields if f in header] if fields else header
+        selected_rows = [
+            {col: row.get(col, "") for col in display_cols}
+            for row in all_rows
+        ]
+        return selected_rows, all_rows
 
     def _execute_search_legacy(
         self,
