@@ -505,14 +505,15 @@ class QueriesPage(QWidget):
         if not index.isValid() or self._last_result is None:
             return
         source_row = self._proxy.mapToSource(index).row()
-        if source_row < 0 or source_row >= len(self._last_result.all_rows):
+        detail_rows = self._last_result.all_rows or self._last_result.rows
+        if source_row < 0 or source_row >= len(detail_rows):
             return
         menu = QMenu(self)
         action_all = menu.addAction("📋  Tüm Alanları Göster")
         action_cell = menu.addAction("🔍  Hücre Değerini Göster")
         chosen = menu.exec(self._table.viewport().mapToGlobal(pos))
         if chosen == action_all:
-            self._show_all_fields(self._last_result.all_rows[source_row])
+            self._show_all_fields(detail_rows[source_row])
         elif chosen == action_cell:
             self._on_cell_double_clicked(index)
 

@@ -127,6 +127,8 @@ class GraylogClient:
             _, all_rows = self._execute_search_legacy(
                 query_string, streams, timerange, fields=[], size=size
             )
+            if not all_rows:
+                all_rows = selected_rows
         except Exception:
             all_rows = selected_rows
 
