@@ -509,30 +509,48 @@ class QueriesPage(QWidget):
         detail_rows = self._last_result.all_rows or self._last_result.rows
         if source_row < 0 or source_row >= len(detail_rows):
             return
+        # selected_row is passed as guaranteed fallback to the detail dialog
+        selected_row = (
+            self._last_result.rows[source_row]
+            if source_row < len(self._last_result.rows) else {}
+        )
         menu = QMenu(self)
         action_all = menu.addAction("📋  Tüm Alanları Göster")
         action_cell = menu.addAction("🔍  Hücre Değerini Göster")
         chosen = menu.exec(self._table.viewport().mapToGlobal(pos))
         if chosen == action_all:
-            self._show_all_fields(detail_rows[source_row])
+            self._show_all_fields(detail_rows[source_row], fallback=selected_row)
         elif chosen == action_cell:
             self._on_cell_double_clicked(index)
 
-    def _show_all_fields(self, row: dict) -> None:
-        # If row carries Graylog message identifiers (_gs_id / _gs_index) fetch
-        # every field from the detail endpoint; otherwise display the row as-is.
-        detail: dict = row
+    def _show_all_fields(self, row: dict, fallback: dict | None = None) -> None:
+        import logging as _log
+        _logger = _log.getLogger(__name__)
+
+        detail: dict | None = None
         gs_id = row.get("_gs_id", "")
         gs_index = row.get("_gs_index", "")
-        if gs_id and gs_index and self._last_profile:
+
+        if gs_id and self._last_profile:
             try:
                 from app.core.encryption import decrypt_token
                 from app.integrations.graylog.client import GraylogClient
                 token = decrypt_token(self._last_profile.TokenEncrypted)
                 client = GraylogClient(self._last_profile.BaseUrl, token)
-                detail = client.fetch_message(gs_index, gs_id)
-            except Exception:
-                pass  # fall back to row
+
+                if not gs_index:
+                    # gl2_source_index missing from CSV — find it via a targeted search
+                    gs_index = client.find_message_index(gs_id)
+
+                if gs_index:
+                    detail = client.fetch_message(gs_index, gs_id)
+            except Exception as exc:
+                _logger.warning("fetch_message failed: %s (gs_id=%r, gs_index=%r)", exc, gs_id, gs_index)
+
+        # Fall back chain: detail API → row fields (2.x all_rows) → selected fields
+        if not detail:
+            non_gs = {k: v for k, v in row.items() if not k.startswith("_gs_")}
+            detail = non_gs if non_gs else (fallback or row)
 
         from PySide6.QtWidgets import (
             QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem,

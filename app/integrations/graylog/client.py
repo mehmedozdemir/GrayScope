@@ -147,6 +147,28 @@ class GraylogClient:
         message = payload.get("message", payload)
         return {k: str(v) for k, v in message.items()}
 
+    def find_message_index(self, message_id: str) -> str:
+        """Find the OpenSearch/ES index for a single message by querying its _id.
+
+        Uses GET /search/universal/relative with a short range and a query
+        on the internal _id field.  Returns "" if the index cannot be determined.
+        """
+        try:
+            params = {
+                "query": f'_id:"{message_id}"',
+                "range": 2592000,  # 30 days — wide enough to find any recent message
+                "limit": 1,
+            }
+            response = self._request("GET", "/search/universal/relative", params=params)
+            if not response.is_success:
+                return ""
+            messages = response.json().get("messages", [])
+            if messages:
+                return messages[0].get("index", "")
+        except Exception:
+            pass
+        return ""
+
     def _execute_search_legacy(
         self,
         query_string: str,
