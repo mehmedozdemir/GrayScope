@@ -52,7 +52,7 @@ from app.ui.components.feedback import EmptyState, badge, show_toast
 from app.ui.components.inputs import SearchInput, labeled_field
 from app.ui.pages.query_form_dialog import QueryFormDialog
 from app.ui.pages.settings_dialog import SettingsDialog
-from app.ui.theme import Colors, Spacing
+from app.ui.theme import Colors, Spacing, Typography, make_font
 from app.ui import theme as _theme
 from app.ui.stylesheets import apply_theme as _apply_theme
 
@@ -568,7 +568,7 @@ class QueriesPage(QWidget):
                 r = table.rowCount()
                 table.insertRow(r)
                 ki = QTableWidgetItem(key)
-                ki.setFont(make_font(size=FontSize.SM, weight=FontWeight.SEMIBOLD))
+                ki.setFont(make_font(size=Typography.SIZE_SM, weight=Typography.WEIGHT_SEMIBOLD))
                 vi = QTableWidgetItem(value)
                 table.setItem(r, 0, ki)
                 table.setItem(r, 1, vi)
