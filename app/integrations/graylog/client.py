@@ -121,18 +121,58 @@ class GraylogClient:
         if not selected_rows:
             return [], []
 
-        # Fetch all fields for the detail view via the legacy endpoint (available
-        # in both 5.x and 2.x). Pass no fields so every message field is returned.
+        # Fetch all fields for the detail view.
+        all_rows = self._fetch_all_fields_5x(query_string, streams, timerange, size)
+        if not all_rows:
+            all_rows = selected_rows
+
+        return selected_rows, all_rows
+
+    def _fetch_all_fields_5x(
+        self,
+        query_string: str,
+        streams: list[str],
+        timerange: dict,
+        size: int,
+    ) -> list[dict[str, str]]:
+        """Fetch every message field for the 5.x detail view.
+
+        Tries three strategies in order:
+        1. POST /search/messages with Accept: application/json (no fields filter)
+        2. Legacy GET /search/universal/* endpoints (present in some 5.x builds)
+        3. Returns [] so caller falls back to selected_rows.
+        """
+        # Strategy 1: JSON response from the scripting API.
+        body: dict = {"query": query_string, "streams": streams, "timerange": timerange}
+        if size and size > 0:
+            body["size"] = size
+        try:
+            resp = self._request("POST", "/search/messages", accept="application/json", json=body)
+            if resp.is_success:
+                payload = resp.json()
+                # Response may be {"messages": [{"message": {...}}, ...]} or a flat list.
+                raw_list = payload if isinstance(payload, list) else payload.get("messages", [])
+                if raw_list:
+                    raw_msgs = [
+                        m.get("message", m) if isinstance(m, dict) else m
+                        for m in raw_list
+                    ]
+                    all_fields = sorted({k for r in raw_msgs for k in r.keys()})
+                    return [{col: str(r.get(col, "")) for col in all_fields} for r in raw_msgs]
+        except Exception:
+            pass
+
+        # Strategy 2: legacy universal search (available in some 5.x deployments).
         try:
             _, all_rows = self._execute_search_legacy(
                 query_string, streams, timerange, fields=[], size=size
             )
-            if not all_rows:
-                all_rows = selected_rows
+            if all_rows:
+                return all_rows
         except Exception:
-            all_rows = selected_rows
+            pass
 
-        return selected_rows, all_rows
+        return []
 
     def _execute_search_legacy(
         self,
