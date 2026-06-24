@@ -139,14 +139,15 @@ class GraylogClient:
         """
         tr_type = timerange.get("type", "relative")
 
+        # Do NOT send ?fields= — we want every field from each message so that
+        # the "Tüm Alanları Göster" detail view can show the full raw record.
+        # selected_rows is filtered client-side to the user's chosen columns.
         params: dict = {
             "query": query_string,
             "limit": size if size > 0 else 150,
         }
         if streams:
             params["filter"] = "streams:" + ",".join(streams)
-        if fields:
-            params["fields"] = ",".join(fields)
 
         if tr_type == "relative":
             params["range"] = timerange.get("range", 300)
@@ -169,13 +170,13 @@ class GraylogClient:
 
         raw_msgs = [msg.get("message", {}) for msg in messages]
 
-        # Determine display columns: requested fields or all fields from first message.
+        # selected_rows: only the columns the user configured
         cols = fields if fields else sorted(raw_msgs[0].keys())
         selected_rows = [
             {col: str(raw.get(col, "")) for col in cols}
             for raw in raw_msgs
         ]
-        # all_rows carries every field present in each message.
+        # all_rows: every field present across all messages (union)
         all_fields = sorted({k for raw in raw_msgs for k in raw.keys()})
         all_rows = [
             {col: str(raw.get(col, "")) for col in all_fields}
