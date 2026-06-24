@@ -147,27 +147,65 @@ class GraylogClient:
         message = payload.get("message", payload)
         return {k: str(v) for k, v in message.items()}
 
-    def find_message_index(self, message_id: str) -> str:
-        """Find the OpenSearch/ES index for a single message by querying its _id.
+    def fetch_message_by_fields(
+        self, message_id: str, fields: list[str], timerange: dict | None = None
+    ) -> dict[str, str]:
+        """Fetch one message by _id using a specific field list via the CSV endpoint."""
+        body: dict = {
+            "query": f'_id:"{message_id}"',
+            "timerange": timerange or {"type": "relative", "range": 2592000},
+            "fields": fields,
+            "size": 1,
+        }
+        try:
+            response = self._request("POST", "/search/messages", accept="text/csv", json=body)
+            if not response.is_success:
+                return {}
+            import csv, io
+            reader = csv.reader(io.StringIO(response.text))
+            header = [col.removeprefix("field: ") for col in next(reader)]
+            for row in reader:
+                return dict(zip(header, row))
+        except Exception:
+            pass
+        return {}
 
-        Uses GET /search/universal/relative with a short range and a query
-        on the internal _id field.  Returns "" if the index cannot be determined.
+    def find_message_index(self, message_id: str) -> str:
+        """Convenience wrapper — returns only the index string."""
+        return self.find_message_meta(message_id).get("index", "")
+
+    def find_message_meta(self, message_id: str) -> dict[str, str]:
+        """Query the legacy universal/relative endpoint for a message by _id.
+
+        Returns a dict with at minimum an "index" key.  On Graylog 5.x the
+        legacy endpoint may return an internal field-names record instead of
+        the actual log message; callers detect this by checking for a
+        "field_names" key in the result.
         """
         try:
             params = {
                 "query": f'_id:"{message_id}"',
-                "range": 2592000,  # 30 days — wide enough to find any recent message
+                "range": 2592000,
                 "limit": 1,
             }
             response = self._request("GET", "/search/universal/relative", params=params)
             if not response.is_success:
-                return ""
+                return {}
             messages = response.json().get("messages", [])
-            if messages:
-                return messages[0].get("index", "")
+            if not messages:
+                return {}
+            entry = messages[0]
+            index = entry.get("index", "")
+            # The message fields live under entry["message"] in the legacy API
+            message_fields = entry.get("message", entry)
+            result: dict[str, str] = {"index": index}
+            # Carry every field from the returned record so callers can
+            # extract field_names (Graylog 5.x meta record) or real log fields
+            for k, v in message_fields.items():
+                result[k] = str(v)
+            return result
         except Exception:
-            pass
-        return ""
+            return {}
 
     def _execute_search_legacy(
         self,

@@ -538,14 +538,30 @@ class QueriesPage(QWidget):
                 token = decrypt_token(self._last_profile.TokenEncrypted)
                 client = GraylogClient(self._last_profile.BaseUrl, token)
 
-                if not gs_index:
-                    # gl2_source_index missing from CSV — find it via a targeted search
-                    gs_index = client.find_message_index(gs_id)
+                # "-" is Graylog 5.x CSV placeholder meaning "unknown index"
+                _INVALID = {"", "-", "null", "none"}
+                if gs_index.strip().lower() in _INVALID:
+                    meta = client.find_message_meta(gs_id)
+                    gs_index = meta.get("index", "")
+                    meta_fields = {k: v for k, v in meta.items() if k != "index"}
 
-                if gs_index:
+                    if meta_fields.get("message"):
+                        detail = meta_fields
+                    elif meta_fields.get("field_names"):
+                        # Meta record with field_names list — re-fetch with those fields
+                        import ast as _ast
+                        try:
+                            field_names = _ast.literal_eval(meta_fields["field_names"])
+                        except Exception:
+                            import json as _json
+                            field_names = _json.loads(meta_fields["field_names"])
+                        if isinstance(field_names, list) and field_names:
+                            detail = client.fetch_message_by_fields(gs_id, field_names)
+
+                if not detail and gs_index and gs_index.strip().lower() not in _INVALID:
                     detail = client.fetch_message(gs_index, gs_id)
             except Exception as exc:
-                _logger.warning("fetch_message failed: %s (gs_id=%r, gs_index=%r)", exc, gs_id, gs_index)
+                _logger.warning("detail fetch failed: %s (gs_id=%r)", exc, gs_id)
 
         # Fall back chain: detail API → row fields (2.x all_rows) → selected fields
         if not detail:
@@ -602,7 +618,9 @@ class QueriesPage(QWidget):
                 table.insertRow(r)
                 ki = QTableWidgetItem(key)
                 ki.setFont(make_font(size=Typography.SIZE_SM, weight=Typography.WEIGHT_SEMIBOLD))
+                ki.setTextAlignment(int(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft))
                 vi = QTableWidgetItem(value)
+                vi.setTextAlignment(int(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft))
                 table.setItem(r, 0, ki)
                 table.setItem(r, 1, vi)
             table.resizeRowsToContents()
