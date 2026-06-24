@@ -82,11 +82,14 @@ class GraylogClient:
         timerange: dict,
         fields: list[str],
         size: int,
-    ) -> list[dict[str, str]]:
+    ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
         """Run a message search, auto-detecting Graylog API version.
 
-        Tries the 5.x Scripting API first (POST /search/messages, CSV).
-        Falls back to the Graylog 2.x universal search API on 404.
+        Returns ``(selected_rows, all_rows)`` where ``selected_rows`` contains
+        only the requested ``fields`` and ``all_rows`` contains every field
+        available in each message (used by the "Tüm Alanları Göster" detail view).
+        For the 5.x CSV path ``all_rows`` equals ``selected_rows`` because the
+        CSV response carries only the requested columns.
         """
         body = {
             "query": query_string,
@@ -112,8 +115,10 @@ class GraylogClient:
         try:
             header = [col.removeprefix("field: ") for col in next(reader)]
         except StopIteration:
-            return []
-        return [dict(zip(header, row)) for row in reader]
+            return [], []
+        rows = [dict(zip(header, row)) for row in reader]
+        # 5.x CSV only carries requested fields — all_rows == rows.
+        return rows, rows
 
     def _execute_search_legacy(
         self,
@@ -160,12 +165,20 @@ class GraylogClient:
 
         messages = payload.get("messages", [])
         if not messages:
-            return []
+            return [], []
 
-        # Determine output columns: requested fields or all fields from first message.
-        first_msg = messages[0].get("message", {})
-        cols = fields if fields else sorted(first_msg.keys())
-        return [
-            {col: str(msg.get("message", {}).get(col, "")) for col in cols}
-            for msg in messages
+        raw_msgs = [msg.get("message", {}) for msg in messages]
+
+        # Determine display columns: requested fields or all fields from first message.
+        cols = fields if fields else sorted(raw_msgs[0].keys())
+        selected_rows = [
+            {col: str(raw.get(col, "")) for col in cols}
+            for raw in raw_msgs
         ]
+        # all_rows carries every field present in each message.
+        all_fields = sorted({k for raw in raw_msgs for k in raw.keys()})
+        all_rows = [
+            {col: str(raw.get(col, "")) for col in all_fields}
+            for raw in raw_msgs
+        ]
+        return selected_rows, all_rows

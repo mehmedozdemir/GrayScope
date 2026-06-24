@@ -32,6 +32,11 @@ PARAM_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)(\?)?(?::([^{}]*))?\}")
 class ExecutionResult:
     fields: list[str]
     rows: list[dict[str, str]]
+    all_rows: list[dict[str, str]] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.all_rows is None:
+            self.all_rows = self.rows
 
 
 def extract_parameters(template: str) -> list[tuple[str, str, bool]]:
@@ -92,11 +97,11 @@ def execute_query(
 
     token = decrypt_token(profile.TokenEncrypted)
     client = GraylogClient(profile.BaseUrl, token)
-    rows = client.execute_search(
+    rows, all_rows = client.execute_search(
         query_string=query_string,
         streams=stream_ids,
         timerange=timerange,
         fields=fields,
         size=query.ResultSize,
     )
-    return ExecutionResult(fields=fields, rows=rows)
+    return ExecutionResult(fields=fields, rows=rows, all_rows=all_rows)

@@ -348,6 +348,7 @@ class QueriesPage(QWidget):
         self._params_layout.setSpacing(Spacing.MD)
         self._param_fields: dict[str, QLineEdit] = {}
         self._param_optional: set[str] = set()
+        self._last_result = None  # ExecutionResult | None
         panel_layout.addWidget(self._params_row)
 
         self._param_separator = QFrame()
@@ -451,6 +452,7 @@ class QueriesPage(QWidget):
         self._table.verticalHeader().setVisible(False)
         self._table.setWordWrap(True)
         self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._proxy = QSortFilterProxyModel(self)
         self._table.setModel(self._proxy)
         self._highlight_delegate = _WrapHighlightDelegate(self._table)
@@ -483,6 +485,7 @@ class QueriesPage(QWidget):
         self._query_input.textChanged.connect(self._on_query_text_changed)
         self._run_button.clicked.connect(self._on_run)
         self._table.doubleClicked.connect(self._on_cell_double_clicked)
+        self._table.customContextMenuRequested.connect(self._on_table_context_menu)
 
     def _on_query_text_changed(self, _text: str = "") -> None:
         # Live edit: keep already-entered values, only adding/removing fields.
@@ -495,6 +498,85 @@ class QueriesPage(QWidget):
         field = self._proxy.headerData(index.column(), Qt.Orientation.Horizontal) or ""
         dialog = CellValueDialog(str(field), value, self.window())
         dialog.exec()
+
+    def _on_table_context_menu(self, pos) -> None:
+        from PySide6.QtWidgets import QMenu
+        index = self._table.indexAt(pos)
+        if not index.isValid() or self._last_result is None:
+            return
+        source_row = self._proxy.mapToSource(index).row()
+        if source_row < 0 or source_row >= len(self._last_result.all_rows):
+            return
+        menu = QMenu(self)
+        action_all = menu.addAction("📋  Tüm Alanları Göster")
+        action_cell = menu.addAction("🔍  Hücre Değerini Göster")
+        chosen = menu.exec(self._table.viewport().mapToGlobal(pos))
+        if chosen == action_all:
+            self._show_all_fields(self._last_result.all_rows[source_row])
+        elif chosen == action_cell:
+            self._on_cell_double_clicked(index)
+
+    def _show_all_fields(self, row: dict) -> None:
+        from PySide6.QtWidgets import (
+            QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
+            QTableWidgetItem, QHeaderView, QLineEdit,
+        )
+        from PySide6.QtCore import Qt as _Qt
+
+        dlg = QDialog(self.window())
+        dlg.setWindowTitle("Tüm Alanlar")
+        dlg.resize(820, 600)
+        layout = QVBoxLayout(dlg)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(8)
+
+        # Filter bar
+        search = QLineEdit()
+        search.setPlaceholderText("Alan veya değer ara…")
+        layout.addWidget(search)
+
+        # Table
+        table = QTableWidget(0, 2, dlg)
+        table.setHorizontalHeaderLabels(["Alan", "Değer"])
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        table.setWordWrap(True)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setAlternatingRowColors(True)
+        layout.addWidget(table)
+
+        # Parse JSON values for nicer display
+        import json as _json
+        all_items: list[tuple[str, str]] = []
+        for key in sorted(row.keys()):
+            raw = row.get(key, "")
+            try:
+                parsed = _json.loads(raw)
+                value = _json.dumps(parsed, ensure_ascii=False, indent=2)
+            except Exception:
+                value = raw
+            all_items.append((key, value))
+
+        def _populate(filter_text: str = "") -> None:
+            ft = filter_text.strip().lower()
+            table.setRowCount(0)
+            for key, value in all_items:
+                if ft and ft not in key.lower() and ft not in value.lower():
+                    continue
+                r = table.rowCount()
+                table.insertRow(r)
+                ki = QTableWidgetItem(key)
+                ki.setFont(make_font(size=FontSize.SM, weight=FontWeight.SEMIBOLD))
+                vi = QTableWidgetItem(value)
+                table.setItem(r, 0, ki)
+                table.setItem(r, 1, vi)
+            table.resizeRowsToContents()
+
+        _populate()
+        search.textChanged.connect(_populate)
+        dlg.exec()
 
     def load_data(self) -> None:
         self._queries = self._queries_repo.get_all()
@@ -935,6 +1017,7 @@ class QueriesPage(QWidget):
         worker.start()
 
     def _on_run_succeeded(self, result: ExecutionResult) -> None:
+        self._last_result = result
         row_count = len(result.rows)
 
         if not result.rows:
