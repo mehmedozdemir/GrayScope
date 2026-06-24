@@ -91,11 +91,16 @@ class GraylogClient:
         For the 5.x CSV path ``all_rows`` equals ``selected_rows`` because the
         CSV response carries only the requested columns.
         """
+        # Always request _id and gl2_source_index alongside user fields so that
+        # we can later call GET /messages/{index}/{id} for the full detail view.
+        _ID_FIELDS = ["_id", "gl2_source_index"]
+        augmented_fields = fields + [f for f in _ID_FIELDS if f not in fields]
+
         body: dict = {
             "query": query_string,
             "streams": streams,
             "timerange": timerange,
-            "fields": fields,
+            "fields": augmented_fields,
         }
         if size and size > 0:
             body["size"] = size
@@ -116,63 +121,31 @@ class GraylogClient:
             header = [col.removeprefix("field: ") for col in next(reader)]
         except StopIteration:
             return [], []
-        selected_rows = [dict(zip(header, row)) for row in reader]
+        full_rows = [dict(zip(header, row)) for row in reader]
 
-        if not selected_rows:
+        if not full_rows:
             return [], []
 
-        # Fetch all fields for the detail view.
-        all_rows = self._fetch_all_fields_5x(query_string, streams, timerange, size)
-        if not all_rows:
-            all_rows = selected_rows
+        # selected_rows: only user's configured fields
+        selected_rows = [{f: r.get(f, "") for f in fields} for r in full_rows]
 
+        # all_rows: carry _gs_id + _gs_index so the UI can lazy-fetch full detail
+        all_rows = [
+            {
+                "_gs_id": r.get("_id", ""),
+                "_gs_index": r.get("gl2_source_index", ""),
+            }
+            for r in full_rows
+        ]
         return selected_rows, all_rows
 
-    def _fetch_all_fields_5x(
-        self,
-        query_string: str,
-        streams: list[str],
-        timerange: dict,
-        size: int,
-    ) -> list[dict[str, str]]:
-        """Fetch every message field for the 5.x detail view.
-
-        Tries three strategies in order:
-        1. POST /search/messages with Accept: application/json (no fields filter)
-        2. Legacy GET /search/universal/* endpoints (present in some 5.x builds)
-        3. Returns [] so caller falls back to selected_rows.
-        """
-        # Strategy 1: JSON response from the scripting API.
-        body: dict = {"query": query_string, "streams": streams, "timerange": timerange}
-        if size and size > 0:
-            body["size"] = size
-        try:
-            resp = self._request("POST", "/search/messages", accept="application/json", json=body)
-            if resp.is_success:
-                payload = resp.json()
-                # Response may be {"messages": [{"message": {...}}, ...]} or a flat list.
-                raw_list = payload if isinstance(payload, list) else payload.get("messages", [])
-                if raw_list:
-                    raw_msgs = [
-                        m.get("message", m) if isinstance(m, dict) else m
-                        for m in raw_list
-                    ]
-                    all_fields = sorted({k for r in raw_msgs for k in r.keys()})
-                    return [{col: str(r.get(col, "")) for col in all_fields} for r in raw_msgs]
-        except Exception:
-            pass
-
-        # Strategy 2: legacy universal search (available in some 5.x deployments).
-        try:
-            _, all_rows = self._execute_search_legacy(
-                query_string, streams, timerange, fields=[], size=size
-            )
-            if all_rows:
-                return all_rows
-        except Exception:
-            pass
-
-        return []
+    def fetch_message(self, index: str, message_id: str) -> dict[str, str]:
+        """Return all fields for one message via GET /messages/{index}/{id}."""
+        response = self._request("GET", f"/messages/{index}/{message_id}")
+        response.raise_for_status()
+        payload = response.json()
+        message = payload.get("message", payload)
+        return {k: str(v) for k, v in message.items()}
 
     def _execute_search_legacy(
         self,

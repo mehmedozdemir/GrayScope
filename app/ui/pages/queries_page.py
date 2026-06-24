@@ -348,7 +348,8 @@ class QueriesPage(QWidget):
         self._params_layout.setSpacing(Spacing.MD)
         self._param_fields: dict[str, QLineEdit] = {}
         self._param_optional: set[str] = set()
-        self._last_result = None  # ExecutionResult | None
+        self._last_result = None   # ExecutionResult | None
+        self._last_profile = None  # GraylogProfile | None
         panel_layout.addWidget(self._params_row)
 
         self._param_separator = QFrame()
@@ -518,11 +519,25 @@ class QueriesPage(QWidget):
             self._on_cell_double_clicked(index)
 
     def _show_all_fields(self, row: dict) -> None:
+        # If row carries Graylog message identifiers (_gs_id / _gs_index) fetch
+        # every field from the detail endpoint; otherwise display the row as-is.
+        detail: dict = row
+        gs_id = row.get("_gs_id", "")
+        gs_index = row.get("_gs_index", "")
+        if gs_id and gs_index and self._last_profile:
+            try:
+                from app.core.encryption import decrypt_token
+                from app.integrations.graylog.client import GraylogClient
+                token = decrypt_token(self._last_profile.TokenEncrypted)
+                client = GraylogClient(self._last_profile.BaseUrl, token)
+                detail = client.fetch_message(gs_index, gs_id)
+            except Exception:
+                pass  # fall back to row
+
         from PySide6.QtWidgets import (
-            QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
-            QTableWidgetItem, QHeaderView, QLineEdit,
+            QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem,
+            QHeaderView, QLineEdit,
         )
-        from PySide6.QtCore import Qt as _Qt
 
         dlg = QDialog(self.window())
         dlg.setWindowTitle("Tüm Alanlar")
@@ -531,12 +546,10 @@ class QueriesPage(QWidget):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(8)
 
-        # Filter bar
         search = QLineEdit()
         search.setPlaceholderText("Alan veya değer ara…")
         layout.addWidget(search)
 
-        # Table
         table = QTableWidget(0, 2, dlg)
         table.setHorizontalHeaderLabels(["Alan", "Değer"])
         table.verticalHeader().setVisible(False)
@@ -548,11 +561,12 @@ class QueriesPage(QWidget):
         table.setAlternatingRowColors(True)
         layout.addWidget(table)
 
-        # Parse JSON values for nicer display
         import json as _json
         all_items: list[tuple[str, str]] = []
-        for key in sorted(row.keys()):
-            raw = row.get(key, "")
+        for key in sorted(detail.keys()):
+            if key.startswith("_gs_"):
+                continue
+            raw = detail.get(key, "")
             try:
                 parsed = _json.loads(raw)
                 value = _json.dumps(parsed, ensure_ascii=False, indent=2)
@@ -1009,6 +1023,7 @@ class QueriesPage(QWidget):
         self._results.setCurrentIndex(_RESULT_LOADING)
         self._run_button.setEnabled(False)
 
+        self._last_profile = profile
         worker = _ExecutionWorker(profile, effective, stream_ids, params, self)
         self._worker = worker
         worker.succeeded.connect(self._on_run_succeeded)
